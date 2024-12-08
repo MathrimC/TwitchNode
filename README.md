@@ -24,7 +24,7 @@ The easiest way to get started is to use the provided auth window scene:
 
 1) Register a new application in the [Twitch Dev Console](https://dev.twitch.tv/console). If you want to use the TwitchNode auth scene, make sure you set the OAuth Redirect URL to https://redirectmeto.com/http://localhost:7345
 2) Run the auth window scene (`addons/twitch_node/auth_window/twitch_auth_window.tscn`)
-<img scr="./documentation/auth_window.png" width="600">
+![twitch_auth_window](./documentation/auth_window.png)
 3) Copy the client id of your application to the `Application Client ID` field
 4) Make sure you have a browser session open logged into your channel account and click the `Create New Token` button next to `Channel access token`. A browser tab will open, showing you info about the scope of the token. Click `Authorize`.
 5) Make sure you have a browser session open logged into the bot account and click the `Create New Token` button next to `Bot account access token`. A browser tab will open, showing you info about the scope of the token. Click `Authorize`.
@@ -39,8 +39,7 @@ Access tokens expire after around 50 days, so you'll have to create new tokens a
 ## Use
 You can use this addon by adding a TwitchNode node to your scene. Make sure you only have one active TwitchNode in your program at any time, to prevent unexpected behaviour.
 To start listening for channel events, call the connect_to_channel function of the TwitchNode. You can connect to the signals of the TwitchNode to get called when events happen like new chat messages, new followers etc. Use the functions of the TwitchNode to perform actions like sending messages, starting polls etc.
-<img scr="./documentation/adding_twitchnode.png" width="600">
-
+![adding_twitchnode](./documentation/adding_twitchnode.png)
 See the twitch_example scene in the example folder for an example of how to use the TwitchNode functions.
 
 ## License
