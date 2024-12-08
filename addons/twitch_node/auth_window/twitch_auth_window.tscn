@@ -1,0 +1,139 @@
+[gd_scene load_steps=5 format=3 uid="uid://c7kyntgy4sqt6"]
+
+[ext_resource type="Script" path="res://addons/twitch_node/auth_window/twitch_auth_window.gd" id="1_fpl08"]
+[ext_resource type="Script" path="res://addons/twitch_node/auth_window/twitch_auth.gd" id="2_2sx86"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hyf55"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_hfv6g"]
+
+[node name="TwitchAuthWindow" type="Window" node_paths=PackedStringArray("twitch_auth")]
+auto_translate_mode = 1
+title = "Twitch Credentials"
+initial_position = 2
+size = Vector2i(640, 400)
+min_size = Vector2i(600, 400)
+script = ExtResource("1_fpl08")
+twitch_auth = NodePath("PanelContainer/TwitchAuth")
+
+[node name="PanelContainer" type="PanelContainer" parent="."]
+self_modulate = Color(0.572534, 0.27454, 1, 1)
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_hyf55")
+
+[node name="TwitchAuth" type="MarginContainer" parent="PanelContainer" node_paths=PackedStringArray("application_id_input", "channel_token_input", "bot_account_token_input", "channel_token_button", "bot_account_token_button")]
+layout_mode = 2
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+script = ExtResource("2_2sx86")
+application_id_input = NodePath("VBoxContainer/ClientId/ClientIdInput")
+channel_token_input = NodePath("VBoxContainer/ChannelToken/ChannelTokenInput")
+bot_account_token_input = NodePath("VBoxContainer/BotToken/BotTokenInput")
+channel_token_button = NodePath("VBoxContainer/ChannelToken/Button")
+bot_account_token_button = NodePath("VBoxContainer/BotToken/Button")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/TwitchAuth"]
+layout_mode = 2
+
+[node name="ClientId" type="HBoxContainer" parent="PanelContainer/TwitchAuth/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="PanelContainer/TwitchAuth/VBoxContainer/ClientId"]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+text = "Application Client ID *"
+
+[node name="ClientIdInput" type="LineEdit" parent="PanelContainer/TwitchAuth/VBoxContainer/ClientId"]
+layout_mode = 2
+size_flags_horizontal = 3
+caret_blink = true
+secret = true
+
+[node name="ChannelToken" type="HBoxContainer" parent="PanelContainer/TwitchAuth/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="PanelContainer/TwitchAuth/VBoxContainer/ChannelToken"]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+text = "Channel access token **"
+
+[node name="ChannelTokenInput" type="LineEdit" parent="PanelContainer/TwitchAuth/VBoxContainer/ChannelToken"]
+layout_mode = 2
+size_flags_horizontal = 3
+secret = true
+
+[node name="Button" type="Button" parent="PanelContainer/TwitchAuth/VBoxContainer/ChannelToken"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Create New Token"
+
+[node name="BotToken" type="HBoxContainer" parent="PanelContainer/TwitchAuth/VBoxContainer"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="PanelContainer/TwitchAuth/VBoxContainer/BotToken"]
+custom_minimum_size = Vector2(230, 0)
+layout_mode = 2
+text = "Bot account access token ***"
+
+[node name="BotTokenInput" type="LineEdit" parent="PanelContainer/TwitchAuth/VBoxContainer/BotToken"]
+layout_mode = 2
+size_flags_horizontal = 3
+secret = true
+
+[node name="Button" type="Button" parent="PanelContainer/TwitchAuth/VBoxContainer/BotToken"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "Create New Token"
+
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer/TwitchAuth/VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_constants/margin_top = 18
+
+[node name="RichTextLabel" type="RichTextLabel" parent="PanelContainer/TwitchAuth/VBoxContainer/MarginContainer"]
+layout_mode = 2
+size_flags_vertical = 4
+focus_mode = 2
+theme_override_font_sizes/normal_font_size = 14
+theme_override_styles/focus = SubResource("StyleBoxEmpty_hfv6g")
+text = "* Create an application in the Twitch Dev Console (https://dev.twitch.tv/console) and copy the Client ID to the Application Client ID field. Make sure the OAuth Redirect URL is set to https://redirectmeto.com/http://localhost:7345
+
+** Have a browser session open logged in to the channel account when clicking the Create New Token button.
+
+*** Have a browser session open logged in to the bot account when clicking the Create New Token button."
+fit_content = true
+selection_enabled = true
+
+[node name="Label" type="Label" parent="PanelContainer/TwitchAuth/VBoxContainer"]
+visible = false
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "
+* Create an application in the Twitch Dev Console (https://dev.twitch.tv/console) and copy the Client ID to the Application Client ID field. Make sure the OAuth Redirect URL is set to https://redirectmeto.com/http://localhost:7345
+
+** Have a browser session open logged in to the channel account when clicking the Create New Token button.
+
+*** Have a browser session open logged in to the bot account when clicking the Create New Token button."
+autowrap_mode = 2
+
+[node name="Button" type="Button" parent="PanelContainer/TwitchAuth"]
+custom_minimum_size = Vector2(70, 0)
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 8
+text = "Close"
+
+[connection signal="close_requested" from="." to="." method="_on_close_requested"]
+[connection signal="text_changed" from="PanelContainer/TwitchAuth/VBoxContainer/ClientId/ClientIdInput" to="PanelContainer/TwitchAuth" method="on_client_id_changed"]
+[connection signal="text_changed" from="PanelContainer/TwitchAuth/VBoxContainer/ChannelToken/ChannelTokenInput" to="PanelContainer/TwitchAuth" method="on_channel_token_changed"]
+[connection signal="pressed" from="PanelContainer/TwitchAuth/VBoxContainer/ChannelToken/Button" to="PanelContainer/TwitchAuth" method="on_channel_token_button_pressed"]
+[connection signal="text_changed" from="PanelContainer/TwitchAuth/VBoxContainer/BotToken/BotTokenInput" to="PanelContainer/TwitchAuth" method="on_bot_account_token_changed"]
+[connection signal="pressed" from="PanelContainer/TwitchAuth/VBoxContainer/BotToken/Button" to="PanelContainer/TwitchAuth" method="on_bot_account_token_button_pressed"]
+[connection signal="pressed" from="PanelContainer/TwitchAuth/Button" to="." method="_on_close_requested"]

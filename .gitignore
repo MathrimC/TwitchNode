@@ -1,0 +1,10 @@
+.godot/
+/android/
+
+.import/
+export.cfg
+export_presets.cfg
+
+documentation/*.import
+icon.*
+project.godot

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+</head>
+<body>
+
+<h1 id="message">Saving access token...</h1>
+<p id="detail"></p>
+
+</body>
+</html>
+<script>
+var token = GetURLParameter("access_token")
+console.log(token)
+fetch("http://localhost:7345", {
+	method: "POST",
+	body: JSON.stringify({
+		token: token
+	}),
+	headers: {
+		"Content-type": "application/json; charset=UTF-8"
+	}
+}).then(function(response) {
+	if (response.ok) {
+		document.getElementById("message").innerHTML = "New access token saved!"
+		document.getElementById("detail").innerHTML = "You can now close this window."
+	} else {
+		document.getElementById("message").innerHTML = "Something went wrong. Please try again, or copy your token manually."
+	}
+});
+function GetURLParameter(sParam)
+{
+	var sPageURL = window.location.hash.substring(1);
+	var sURLVariables = sPageURL.split('&');
+	for (var i = 0; i < sURLVariables.length; i++) 
+	{
+		var sParameterName = sURLVariables[i].split('=');
+		if (sParameterName[0] == sParam) 
+		{
+			return sParameterName[1];
+		}
+	}
+}
+</script>
