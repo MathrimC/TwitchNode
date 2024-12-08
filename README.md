@@ -1,5 +1,5 @@
 # TwitchNode
-TwitchNode is a Godot library for easily interfacing with Twitch from GDScript. It can be used for developing Twitch integrated games, chatbots, chat applications or stream overlays.
+TwitchNode is a Godot library for easy interfacing with Twitch from GDScript. It can be used for developing Twitch integrated games, chatbots, chat applications or stream overlays.
 
 ## Features
 - Provides GDScript signals for incoming chat messages, bits, channel info updates, followers, subs, hype trains, raids, polls, predictions, channel points redemptions and vip changes.
