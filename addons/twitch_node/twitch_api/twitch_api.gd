@@ -433,12 +433,8 @@ func get_followers(channel: String, page: String = "", user: String = "") -> Dic
 		if page != "":
 			query_parameters["after"] = page
 		if user_id != "":
-			print("setting user id %s for get followers" % user_id)
 			query_parameters["user_id"] = user_id
 		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_FOLLOWERS, "", {}, query_parameters)
-		print(request.result)
-		print(request.response_code)
-		print(request.response_body)
 		return request.response_body
 	else:
 		printerr("Can't get followers due to missing channel id")
@@ -824,17 +820,13 @@ func _store_credentials() -> void:
 	encrypted_credentials["client_id"] = encrypted_client_id
 	encrypted_credentials["channel_access_token"] = encrypted_channel_access_token
 	encrypted_credentials["user_access_token"] = encrypted_user_access_token
-	# print("before save: %s" % encrypted_credentials)
 	var file = FileAccess.open("user://twitch_credentials", FileAccess.WRITE)
-	# file.store_string(JSON.stringify(encrypted_credentials))
 	file.store_buffer(var_to_bytes(encrypted_credentials))
 
 func _load_credentials() -> bool:
 	if FileAccess.file_exists("user://twitch_credentials"):
 		var file := FileAccess.open("user://twitch_credentials", FileAccess.READ)
 		var encrypted_credentials = bytes_to_var(file.get_buffer(file.get_length()))
-		# var encrypted_credentials: Dictionary = JSON.parse_string(file.get_as_text())
-		# print("after load: %s" % encrypted_credentials)
 		encrypted_client_id = encrypted_credentials["client_id"]
 		encrypted_channel_access_token = encrypted_credentials["channel_access_token"]
 		encrypted_user_access_token = encrypted_credentials["user_access_token"]

@@ -156,7 +156,6 @@ func process_command(_user: String, _message: String) -> void:
 		var split := _message.split(" ")
 		if split.size() > 1:
 			user = split[1]
-		print("checking followage for %s" % user)
 		var follower_info := await twitch_node.get_follower_info(channel_name, user)
 		if !follower_info.is_empty():
 			var followed_time_dict := Time.get_datetime_dict_from_datetime_string(str(follower_info["followed_at"]), true)

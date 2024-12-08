@@ -4,59 +4,9 @@
 class_name TwitchNode
 extends Node
 
-
 enum ErrorCode { UNAUTHORIZED, INVALID_TOKEN, UNAVAILABLE, UNKNOWN_USER, BAD_INPUT }
 enum TokenState { EMPTY, VALID, INVALID, CHECKING, UNKNOWN }
 
-## Event data format:
-##  "event": {
-##    "broadcaster_user_id": "1971641",
-##    "broadcaster_user_login": "streamer",
-##    "broadcaster_user_name": "streamer",
-##    "chatter_user_id": "4145994",
-##    "chatter_user_login": "viewer32",
-##    "chatter_user_name": "viewer32",
-##    "message_id": "cc106a89-1814-919d-454c-f4f2f970aae7",
-##    "message": {
-##      "text": "Hi chat",
-##      "fragments": [
-##        {
-##          "type": "text",
-##          "text": "Hi chat",
-##          "cheermote": null,
-##          "emote": null,
-##          "mention": null
-##        }
-##      ]
-##    },
-##    "color": "#00FF7F",
-##    "badges": [
-##      {
-##        "set_id": "moderator",
-##        "id": "1",
-##        "info": ""
-##      },
-##      {
-##        "set_id": "subscriber",
-##        "id": "12",
-##        "info": "16"
-##      },
-##      {
-##        "set_id": "sub-gifter",
-##        "id": "1",
-##        "info": ""
-##      }
-##    ],
-##    "message_type": "text",
-##    "cheer": null,
-##    "reply": null,
-##    "channel_points_custom_reward_id": null,
-##    "source_broadcaster_user_id": null,
-##    "source_broadcaster_user_login": null,
-##    "source_broadcaster_user_name": null,
-##    "source_message_id": null,
-##    "source_badges": null
-##  }
 signal new_chat_message(channel: String, user: String, message: String, event_data: Dictionary)
 signal channel_info_updated(channel: String, title: String, category: String, event_data: Dictionary)
 signal new_follower(channel: String, follower: String, event_data: Dictionary)
@@ -107,7 +57,6 @@ signal error_occured(error_code, error_info: Dictionary)
 @export var manage_raids := true
 
 var _twitch_api: TwitchAPI
-# var _prediction_info: Dictionary
 var _followers_page: String
 var _subs_page: String
 var _vips_page: String
