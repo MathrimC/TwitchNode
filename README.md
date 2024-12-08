@@ -17,7 +17,8 @@ No support (yet) for:
 - OAuth grant flows other than the Implicit grant flow
 
 ## Install
-Clone the project or download the zip file. Copy the files to your project folder.
+Clone the project or download the zip file. Copy the files and folders to your project folder. Make sure they are in the root directory of your project.
+![project_folder](./documentation/project_folder.png)
 
 ## Getting started
 The easiest way to get started is to use the provided auth window scene:
@@ -29,18 +30,18 @@ The easiest way to get started is to use the provided auth window scene:
 4) Make sure you have a browser session open logged into your channel account and click the `Create New Token` button next to `Channel access token`. A browser tab will open, showing you info about the scope of the token. Click `Authorize`.
 5) Make sure you have a browser session open logged into the bot account and click the `Create New Token` button next to `Bot account access token`. A browser tab will open, showing you info about the scope of the token. Click `Authorize`.
 
-The tokens are automatically picked up by godot and saved in an encrypted file in the user directory of the project. You can reuse (parts of) the auth window in your own programs to allow users to easily generate access tokens.
+The tokens are automatically picked up by godot and saved in an encrypted file in the user directory of the project, they will automatically be retrieved when a TwitchNode is initialized. You can reuse (parts of) the auth window in your own programs to allow users to easily generate access tokens.
 You can now start using the Twitch API services by adding a TwitchNode node to your scene and calling the connect_to_channel function.
 
-Alternatively, instead of using the auth window scene, you can call the set_credentials functions of TwitchNode to set the client id and channel and user access tokens.
+Alternatively, instead of using the auth window scene, you can call the set_credentials functions of TwitchNode to set the client id and channel and user access tokens. If the store parameter is set to true, it will save the credentials in an encrypted file in the project user directory and the credentials will automatically be retrieved on future executions.
 
 Access tokens expire after around 50 days, so you'll have to create new tokens after that.
 
 ## Use
 You can use this addon by adding a TwitchNode node to your scene. Make sure you only have one active TwitchNode in your program at any time, to prevent unexpected behaviour.
-To start listening for channel events, call the connect_to_channel function of the TwitchNode. You can connect to the signals of the TwitchNode to get called when events happen like new chat messages, new followers etc. Use the functions of the TwitchNode to perform actions like sending messages, starting polls etc.
+To start listening for channel events, call the connect_to_channel function of the TwitchNode. You can connect to the signals of the TwitchNode to get called when events happen like new chat messages, new followers etc. Use the functions of the TwitchNode to perform actions like sending messages, starting polls etc. The channelname passed in input should be the channel for which an access token has been created.
 ![adding_twitchnode](./documentation/adding_twitchnode.png)
-See the twitch_example scene in the example folder for an example of how to use the TwitchNode functions.
+See the twitch_example scene in the example folder for an example of how to use the TwitchNode functions. To run this example, fill in the variables `channel name` and `bot account name` in the inspector with the account names for which tokens have been generated.
 
 ## License
 This project is released under the MIT license by MathrimC (2024)
