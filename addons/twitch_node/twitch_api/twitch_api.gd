@@ -188,7 +188,6 @@ var request_queue: Array[TwitchAPIRequest]
 var request_pool: Array[TwitchAPIRequest]
 var session_id: String = ""
 var socket := WebSocketPeer.new()
-var has_credentials: bool
 var encrypted_client_id: PackedByteArray
 var encrypted_channel_access_token: PackedByteArray
 var encrypted_user_access_token: PackedByteArray
@@ -202,7 +201,7 @@ var key: CryptoKey
 func _ready() -> void:
 	rate_limit = twitch_node.rate_limit
 	rate_limit_remaining = twitch_node.rate_limit
-	has_credentials = _init_credentials()
+	_init_credentials()
 	_validation_loop()
 	_rate_limit_loop()
 	_request_cleanup_loop()

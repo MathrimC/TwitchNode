@@ -2,6 +2,7 @@ extends Node
 
 const twitch_auth_scene: PackedScene = preload("res://addons/twitch_node/auth_window/twitch_auth_window.tscn")
 const months_length: Array[int] = [0,31,28,31,30,31,30,31,31,30,31,30,31]
+const weekdays: Array[String] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
 @export var channel_name: String
 @export var bot_account_name: String
@@ -159,7 +160,7 @@ func process_command(_user: String, _message: String) -> void:
 		var follower_info := await twitch_node.get_follower_info(channel_name, user)
 		if !follower_info.is_empty():
 			var followed_time_dict := Time.get_datetime_dict_from_datetime_string(str(follower_info["followed_at"]), true)
-			var msg := "%s has been following since %02d:%02d on %s %s/%s/%s. " % [user, followed_time_dict["hour"], followed_time_dict["minute"], _get_week_day_name(followed_time_dict["weekday"] as int), followed_time_dict["day"], followed_time_dict["month"], followed_time_dict["year"]]
+			var msg := "%s has been following since %02d:%02d on %s %s/%s/%s. " % [user, followed_time_dict["hour"], followed_time_dict["minute"], weekdays[followed_time_dict["weekday"] as int], followed_time_dict["day"], followed_time_dict["month"], followed_time_dict["year"]]
 			var passed_time_dict := _get_elapsed_datetime(followed_time_dict, Time.get_datetime_dict_from_system())
 			var years: int = passed_time_dict["year"]
 			var months: int = passed_time_dict["month"]
@@ -202,25 +203,6 @@ func _add_label(_text: String) -> void:
 func _scroll_down() -> void:
 	await get_tree().process_frame
 	scroll_container.scroll_vertical = scroll_container.get_v_scroll_bar().max_value as int
-
-func _get_week_day_name(day: int) -> String:
-	match day:
-		0:
-			return "Sunday"
-		1:
-			return "Monday"
-		2:
-			return "Tuesday"
-		3:
-			return "Wednesday"
-		4:
-			return "Thursday"
-		5:
-			return "Friday"
-		6:
-			return "Saturday"
-	printerr("Unkown weekday %s" % day)
-	return ""
 
 func _get_elapsed_datetime(from: Dictionary, to: Dictionary) -> Dictionary:
 	var elapsed: Dictionary

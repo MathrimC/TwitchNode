@@ -40,22 +40,6 @@ signal error_occured(error_code, error_info: Dictionary)
 ## Max amount of calls that can be done in one minute
 @export var rate_limit := 100
 
-@export_group("Scope")
-@export var chat_message_events := true
-@export var follow_events := true
-@export var subscribe_events := true
-@export var raid_events := true
-@export var poll_events := true
-@export var channel_points_redemption_events := true
-@export var send_chat_messages := true
-@export var manage_polls := true
-@export var manage_predictions := true
-@export var send_shoutouts := true
-@export var warn_users := true
-@export var ban_users := true
-@export var manage_vips := true
-@export var manage_raids := true
-
 var _twitch_api: TwitchAPI
 var _followers_page: String
 var _subs_page: String
@@ -210,7 +194,6 @@ func has_valid_credentials() -> bool:
 	while get_token_state("channel") == TokenState.CHECKING || get_token_state("user") == TokenState.CHECKING:
 		await token_validated
 	return get_token_state("channel") == TokenState.VALID && get_token_state("user") == TokenState.VALID
-
 
 func get_client_id() -> String:
 	return _twitch_api.get_client_id()

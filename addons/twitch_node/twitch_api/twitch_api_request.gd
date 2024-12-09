@@ -142,9 +142,6 @@ func set_request_data(_twitch_api: TwitchAPI, _account: String, _api_operation: 
 		_determine_account()
 
 func execute_request() -> void:
-	if !twitch_api.has_credentials:
-		printerr("Can't execute API request due to missing credentials")
-		return
 	while twitch_api.token_states[account] == TwitchNode.TokenState.CHECKING:
 		await twitch_api.twitch_node.token_validated
 	if twitch_api.token_states[account] != TwitchNode.TokenState.VALID:
