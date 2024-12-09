@@ -45,7 +45,6 @@ func _connect_to_channel() -> void:
 	if await twitch_node.has_valid_credentials():
 		if twitch_node.token_validated.is_connected(on_token_validated):
 			twitch_node.token_validated.disconnect(on_token_validated)
-		twitch_node.token_validated.disconnect(on_token_validated)
 		twitch_node.connect_to_channel(channel_name)
 	elif twitch_auth_window == null:
 		twitch_auth_window = twitch_auth_scene.instantiate()
