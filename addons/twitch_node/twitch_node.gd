@@ -44,6 +44,7 @@ var _twitch_api: TwitchAPI
 var _followers_page: String
 var _subs_page: String
 var _vips_page: String
+var _moderators_page: String
 
 func _ready() -> void:
 	_twitch_api = TwitchAPI.new()
@@ -73,6 +74,10 @@ func warn_user(channel: String, warned_username: String, reason: String) -> void
 func ban_user(channel: String, banned_username: String, duration: int = -1, reason: String = "") -> void:
 	_twitch_api.ban_user(channel, banned_username, duration, reason)
 
+func is_vip(channel: String, username: String) -> bool:
+	var response = await _twitch_api.get_vips(channel, "", username)
+	return !response.is_empty() && !response["data"].is_empty()
+
 ## Gets the first 100 vips. If the channel has more than 100 vips, get_next_vips can be called to retrieve the next 100 vips
 func get_vips(channel: String) -> Dictionary:
 	var response = await _twitch_api.get_vips(channel)
@@ -94,6 +99,15 @@ func get_next_vips(channel: String) -> Dictionary:
 func add_vip(channel: String, vip_username: String) -> void:
 	_twitch_api.add_vip(channel, vip_username)
 
+## Returns a dictionary with keys "tier", "plan_name", "is_gift", "gifter_name", "gifter_login", "gifter_id", "user_name", "user_login", "user_id", "broadcaster_name", "broadcaster_login", "broadcaster_id".
+## If the user isn't a sub, an empty dictionary is returned
+func get_sub_info(channel: String, username: String) -> Dictionary:
+	var response = await _twitch_api.get_subs(channel, "", username)
+	if !response.is_empty() && !response["data"].is_empty():
+		return response["data"][0]
+	else:
+		return {}
+
 func get_subs(channel: String) -> Dictionary:
 	var response = await _twitch_api.get_subs(channel)
 	if !response["pagination"].is_empty():
@@ -110,6 +124,7 @@ func get_next_subs(channel: String) -> Dictionary:
 		_subs_page = ""
 	return response
 
+## Returns a dictionary with keys "user_id", "user_name", "user_login" and "followed_at"
 func get_follower_info(channel: String, username: String) -> Dictionary:
 	var response = await _twitch_api.get_followers(channel, "", username)
 	if !response.is_empty() && !response["data"].is_empty():
@@ -135,6 +150,30 @@ func get_next_followers(channel: String) -> Dictionary:
 		_followers_page = response["pagination"]["cursor"]
 	else:
 		_followers_page = ""
+	return response
+
+func is_moderator(channel: String, username: String) -> bool:
+	var response = await _twitch_api.get_moderators(channel, "", username)
+	return !response.is_empty() && !response["data"].is_empty()
+
+## Return the first 100 moderators of the channel. To retrieve the next 100, call get_next_moderators
+func get_moderators(channel: String) -> Dictionary:
+	var response = await _twitch_api.get_moderators(channel)
+	if !response["pagination"].is_empty():
+		_moderators_page = response["pagination"]["cursor"]
+	else:
+		_moderators_page = ""
+	return response
+
+## Retrieves the next 100 moderators. Returns an empty dictionary if there are no more moderators
+func get_next_moderators(channel: String) -> Dictionary:
+	if _moderators_page == "":
+		return {}
+	var response = await _twitch_api.get_moderators(channel, _moderators_page)
+	if !response["pagination"].is_empty():
+		_moderators_page = response["pagination"]["cursor"]
+	else:
+		_moderators_page = ""
 	return response
 
 func create_poll(channel: String, poll_title: String, poll_choices: Array[String], poll_duration: int) -> void:

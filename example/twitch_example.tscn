@@ -5,6 +5,8 @@
 
 [node name="TwitchExample" type="Node" node_paths=PackedStringArray("twitch_node", "scroll_container", "info_container", "poll_label", "hypetrain_label")]
 script = ExtResource("1_od6ma")
+channel_name = null
+bot_account_name = null
 twitch_node = NodePath("TwitchNode")
 scroll_container = NodePath("PanelContainer/VBoxContainer/ScrollContainer")
 info_container = NodePath("PanelContainer/VBoxContainer/ScrollContainer/InfoContainer")
@@ -59,5 +61,6 @@ text = "auth settings"
 
 [node name="TwitchNode" type="Node" parent="."]
 script = ExtResource("2_g4gm0")
+rate_limit = null
 
 [connection signal="pressed" from="PanelContainer/MarginContainer/Button" to="." method="on_auth_button_pressed"]

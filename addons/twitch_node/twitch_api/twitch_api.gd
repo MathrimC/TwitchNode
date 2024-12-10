@@ -371,7 +371,14 @@ func ban_user(channel: String, banned_username: String, duration: int = -1, reas
 	else:
 		printerr("Can't ban user %s due to missing user ids" % banned_username)
 
-func get_vips(channel: String, page: String = "") -> Dictionary:
+func get_vips(channel: String, page: String = "", user: String = "") -> Dictionary:
+	var user_id := ""
+	if user != "":
+		if await _check_user_ids([user]):
+			user_id = user_list[user]
+		else:
+			printerr("Can't get vip info for unknown user %s" % user)
+			return {}
 	if await _check_user_ids([channel]):
 		var channel_id = user_list[channel]
 		var query_parameters := {
@@ -380,6 +387,8 @@ func get_vips(channel: String, page: String = "") -> Dictionary:
 		}
 		if page != "":
 			query_parameters["page"] = page
+		if user_id != "":
+			query_parameters["user_id"] = user_id
 		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_VIPS, "", {}, query_parameters)
 		return request.response_body
 	else:
@@ -400,7 +409,14 @@ func add_vip(channel: String, vip_username = "", page: String = "") -> void:
 	else:
 		printerr("Can't add %s as vip due to missing user ids" % vip_username)
 
-func get_subs(channel: String, page: String = "") -> Dictionary:
+func get_subs(channel: String, page: String = "", user: String = "") -> Dictionary:
+	var user_id := ""
+	if user != "":
+		if await _check_user_ids([user]):
+			user_id = user_list[user]
+		else:
+			printerr("Can't get sub info for unknown user %s" % user)
+			return {}
 	if await _check_user_ids([channel]):
 		var channel_id = user_list[channel]
 		var query_parameters := {
@@ -409,6 +425,8 @@ func get_subs(channel: String, page: String = "") -> Dictionary:
 		}
 		if page != "":
 			query_parameters["after"] = page
+		if user_id != "":
+			query_parameters["user_id"] = user_id
 		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_SUBS, "", {}, query_parameters)
 		return request.response_body
 	else:
@@ -437,6 +455,30 @@ func get_followers(channel: String, page: String = "", user: String = "") -> Dic
 		return request.response_body
 	else:
 		printerr("Can't get followers due to missing channel id")
+		return {}
+
+func get_moderators(channel: String, page: String = "", user: String = "") -> Dictionary:
+	var user_id := ""
+	if user != "":
+		if await _check_user_ids([user]):
+			user_id = user_list[user]
+		else:
+			printerr("Can't get moderator info for unknown user %s" % user)
+			return {}
+	if await _check_user_ids([channel]):
+		var channel_id = user_list[channel]
+		var query_parameters := {
+			"broadcaster_id" : channel_id,
+			"first" : 100,
+		}
+		if page != "":
+			query_parameters["after"] = page
+		if user_id != "":
+			query_parameters["user_id"] = user_id
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_MODERATORS, "", {}, query_parameters)
+		return request.response_body
+	else:
+		printerr("Can't get moderators due to missing channel id")
 		return {}
 
 func create_poll(channel: String, poll_title: String, poll_choices: Array[String], poll_duration: int) -> void:
@@ -558,7 +600,10 @@ static func get_channel_scope() -> String:
 	var scopes: Array[String]
 	for operation  in TwitchAPIRequest.api_operations.values():
 		var scope: String = operation["scope"]
-		if (scope.begins_with("channel") || scope.begins_with("moderator")) && !scopes.has(scope):
+		if (scope.begins_with("channel") \
+				|| scope.begins_with("moderator") \
+				|| scope.begins_with("moderation")) \
+				&& !scopes.has(scope):
 			scopes.append(scope)
 	for event: Dictionary in events.values():
 		var scope: String = event["scope"]

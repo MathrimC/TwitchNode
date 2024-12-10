@@ -155,7 +155,20 @@ func process_command(_user: String, _message: String) -> void:
 		var user := _user
 		var split := _message.split(" ")
 		if split.size() > 1:
-			user = split[1]
+			user = split[1].to_lower()
+		twitch_node.send_chat_message(channel_name, bot_account_name, await _followage(user))
+	if _message.begins_with("!privilege"):
+		var user := _user
+		var split := _message.split(" ")
+		if split.size() > 1:
+			user = split[1].to_lower()
+		var msg := await _followage(user)
+		msg += ". " + await _subbage(user)
+		msg += ". " + await _moddage(user)
+		msg += ". " + await _vippage(user) + "."
+		twitch_node.send_chat_message(channel_name, bot_account_name, msg)
+
+func _followage(user: String) -> String:
 		var follower_info := await twitch_node.get_follower_info(channel_name, user)
 		if !follower_info.is_empty():
 			var followed_time_dict := Time.get_datetime_dict_from_datetime_string(str(follower_info["followed_at"]), true)
@@ -187,9 +200,32 @@ func process_command(_user: String, _message: String) -> void:
 				msg += " %s minute" % minutes
 				if minutes > 1:
 					msg += "s"
-			twitch_node.send_chat_message(channel_name, bot_account_name, msg)
+			return msg
 		else:
-			twitch_node.send_chat_message(channel_name, bot_account_name, "%s is not following the channel" % user)
+			return "%s is not following the channel" % user
+
+func _subbage(user: String) -> String:
+	var sub_info = await twitch_node.get_sub_info(channel_name, user)
+	if sub_info.is_empty():
+		return "They are not subbed"
+	else:
+		var tier: int = round(int(sub_info["tier"]) / 1000.)
+		if !sub_info["is_gift"]:
+			return "They are a tier %s sub" % tier
+		else:
+			return "They received a tier %s gift sub from %s" % [tier, sub_info["gifter_name"]]
+
+func _moddage(user: String) -> String:
+	if await twitch_node.is_moderator(channel_name, user):
+		return "They are a mod"
+	else:
+		return "They are not a mod"
+
+func _vippage(user: String) -> String:
+	if await twitch_node.is_vip(channel_name, user):
+		return "They are a vip"
+	else:
+		return "They are not a vip"
 
 func _add_label(_text: String) -> void:
 	var label := RichTextLabel.new()

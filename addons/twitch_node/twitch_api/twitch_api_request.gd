@@ -1,7 +1,7 @@
 class_name TwitchAPIRequest
 extends HTTPRequest
 
-enum APIOperation { GET_USER_INFO, GET_GAMES, SUBSCRIBE_TO_EVENT, POST_CHAT_MESSAGE, GET_CHANNEL_INFO, MODIFY_CHANNEL_INFO, CREATE_POLL, SEND_SHOUTOUT, BAN_USER, GET_VIPS, ADD_VIP, GET_SUBS, GET_FOLLOWERS, CREATE_PREDICTION, END_PREDICTION, START_RAID, CANCEL_RAID, WARN_USER, CREATE_CUSTOM_REWARD, UPDATE_REDEMPTION_STATUS, SEND_CHAT_ANNOUNCEMENT }
+enum APIOperation { GET_USER_INFO, GET_GAMES, SUBSCRIBE_TO_EVENT, POST_CHAT_MESSAGE, GET_CHANNEL_INFO, MODIFY_CHANNEL_INFO, CREATE_POLL, SEND_SHOUTOUT, BAN_USER, GET_VIPS, ADD_VIP, GET_SUBS, GET_FOLLOWERS, GET_MODERATORS, CREATE_PREDICTION, END_PREDICTION, START_RAID, CANCEL_RAID, WARN_USER, CREATE_CUSTOM_REWARD, UPDATE_REDEMPTION_STATUS, SEND_CHAT_ANNOUNCEMENT }
 enum ErrorCode { OK, INVALID_TOKEN, HTTP_ERROR, REQUEST_ERROR }
 
 signal twitch_api_request_completed(request: TwitchAPIRequest, result: Result)
@@ -72,6 +72,11 @@ const api_operations: Dictionary = {
 	APIOperation.GET_FOLLOWERS: {
 		"endpoint": "channels/followers",
 		"scope": "moderator:read:followers",
+		"method": HTTPClient.METHOD_GET
+	},
+	APIOperation.GET_MODERATORS: {
+		"endpoint": "moderation/moderators",
+		"scope": "moderation:read",
 		"method": HTTPClient.METHOD_GET
 	},
 	APIOperation.CREATE_PREDICTION: {
@@ -183,6 +188,7 @@ func _determine_account() -> void:
 	var scope: String = api_operations[api_operation]["scope"]
 	if scope.begins_with("channel") \
 			|| scope.begins_with("moderator") \
+			|| scope.begins_with("moderation") \
 			|| (api_operation == APIOperation.SUBSCRIBE_TO_EVENT):
 		account = "channel"
 	else:
