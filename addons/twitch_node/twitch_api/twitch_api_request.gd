@@ -196,7 +196,7 @@ func _determine_account() -> void:
 
 func _get_request_headers() -> PackedStringArray:
 	return [
-		"Authorization: Bearer %s" % twitch_api.crypto.decrypt(twitch_api.key, twitch_api.encrypted_tokens[account]).get_string_from_utf8(),
+		"Authorization: Bearer %s" % twitch_api.crypto.decrypt(twitch_api.key, twitch_api.encrypted_credentials[account]).get_string_from_utf8(),
 		"Client-Id: %s" % twitch_api.get_client_id(),
 		"Content-Type: application/json"
 	]

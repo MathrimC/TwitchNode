@@ -188,10 +188,7 @@ var request_queue: Array[TwitchAPIRequest]
 var request_pool: Array[TwitchAPIRequest]
 var session_id: String = ""
 var socket := WebSocketPeer.new()
-var encrypted_client_id: PackedByteArray
-var encrypted_channel_access_token: PackedByteArray
-var encrypted_user_access_token: PackedByteArray
-var encrypted_tokens: Dictionary
+var encrypted_credentials: Dictionary
 ## key: "channel" or "user", value: TwitchNode.TokenState
 var token_states: Dictionary
 var key: CryptoKey
@@ -650,7 +647,7 @@ func get_useraccount_auth_url(_redirect_uri: String) -> String:
 	return auth_uri + "?" + HTTPClient.new().query_string_from_dict(query_parameters)
 
 func get_client_id() -> String:
-	return crypto.decrypt(key, encrypted_client_id).get_string_from_utf8()
+	return crypto.decrypt(key, encrypted_credentials["client_id"]).get_string_from_utf8()
 
 func _get_event_sub_body(event_type: EventType, channel_id: String) -> Dictionary:
 	var body := { "type": "", "version": "1", "condition": { "broadcaster_user_id": channel_id}, "transport" : {"method": "websocket", "session_id": session_id}}
@@ -813,8 +810,8 @@ func _process_message(message_data: Dictionary) -> void:
 
 func _validation_loop() -> void:
 	while true:
-		_validate_token(encrypted_channel_access_token, "channel")
-		_validate_token(encrypted_user_access_token, "user")
+		_validate_token(encrypted_credentials["channel"], "channel")
+		_validate_token(encrypted_credentials["user"], "user")
 		await get_tree().create_timer(3599).timeout
 
 func _validate_token(encrypted_token: PackedByteArray, account: String) -> void:
@@ -841,41 +838,33 @@ func _validate_token(encrypted_token: PackedByteArray, account: String) -> void:
 
 func set_credentials(client_id: String, channel_token: String, user_token: String, store: bool) -> void:
 	if client_id != "":
-		encrypted_client_id = crypto.encrypt(key, client_id.to_utf8_buffer())
+		encrypted_credentials["client_id"] = crypto.encrypt(key, client_id.to_utf8_buffer())
 	if channel_token != "":
-		encrypted_channel_access_token = crypto.encrypt(key, channel_token.to_utf8_buffer())
-		encrypted_tokens["channel"] = encrypted_channel_access_token
-		_validate_token(encrypted_channel_access_token, "channel")
+		encrypted_credentials["channel"] = crypto.encrypt(key, channel_token.to_utf8_buffer())
+		_validate_token(encrypted_credentials["channel"], "channel")
 	if user_token != "":
-		encrypted_user_access_token = crypto.encrypt(key, user_token.to_utf8_buffer())
-		encrypted_tokens["user"] = encrypted_user_access_token
-		_validate_token(encrypted_user_access_token, "user")
+		encrypted_credentials["user"] = crypto.encrypt(key, user_token.to_utf8_buffer()) 
+		_validate_token(encrypted_credentials["user"], "user")
 	if store:
 		_store_credentials()
 
 func _init_credentials() -> bool:
 	_init_key()
+	encrypted_credentials["version"] = "0.1"
+	encrypted_credentials["client_id"] = []
+	encrypted_credentials["channel"] = []
+	encrypted_credentials["user"] = []
 	_load_credentials()
-	return !encrypted_client_id.is_empty() && !encrypted_channel_access_token.is_empty() && !encrypted_user_access_token.is_empty()
+	return !encrypted_credentials["client_id"].is_empty() && !encrypted_credentials["channel"].is_empty() && !encrypted_credentials["user"].is_empty()
 
 func _store_credentials() -> void:
-	var encrypted_credentials: Dictionary
-	# TODO: test this
-	encrypted_credentials["client_id"] = encrypted_client_id
-	encrypted_credentials["channel_access_token"] = encrypted_channel_access_token
-	encrypted_credentials["user_access_token"] = encrypted_user_access_token
 	var file = FileAccess.open("user://twitch_credentials", FileAccess.WRITE)
 	file.store_buffer(var_to_bytes(encrypted_credentials))
 
 func _load_credentials() -> bool:
 	if FileAccess.file_exists("user://twitch_credentials"):
 		var file := FileAccess.open("user://twitch_credentials", FileAccess.READ)
-		var encrypted_credentials := bytes_to_var(file.get_buffer(file.get_length()))
-		encrypted_client_id = encrypted_credentials["client_id"]
-		encrypted_channel_access_token = encrypted_credentials["channel_access_token"]
-		encrypted_user_access_token = encrypted_credentials["user_access_token"]
-		encrypted_tokens["channel"] = encrypted_channel_access_token
-		encrypted_tokens["user"] = encrypted_user_access_token
+		encrypted_credentials = bytes_to_var(file.get_buffer(file.get_length()))
 		return true
 	else:
 		return false
