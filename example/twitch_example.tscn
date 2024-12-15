@@ -5,8 +5,6 @@
 
 [node name="TwitchExample" type="Node" node_paths=PackedStringArray("twitch_node", "scroll_container", "info_container", "poll_label", "hypetrain_label")]
 script = ExtResource("1_od6ma")
-channel_name = "MathrimC"
-bot_account_name = "botrimc"
 twitch_node = NodePath("TwitchNode")
 scroll_container = NodePath("PanelContainer/VBoxContainer/ScrollContainer")
 info_container = NodePath("PanelContainer/VBoxContainer/ScrollContainer/InfoContainer")
