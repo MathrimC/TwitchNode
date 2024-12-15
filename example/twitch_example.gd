@@ -133,7 +133,9 @@ func on_hype_train_started(_channel: String, _event_data: Dictionary) -> void:
 	hypetrain_label.visible = true
 
 func on_hype_train_progress(_channel: String, _level: int, _event_data: Dictionary) -> void:
-	var lvl_pct: int = roundi((_event_data["progress"] as float / _event_data["goal"] as float) * 100.)
+	var progress: int = _event_data["progress"]
+	var goal: int = _event_data["goal"]
+	var lvl_pct: int = roundi((progress as float / goal as float) * 100.)
 	var msg := "Hype train in progress: lvl %s, %s %%" % [_level, lvl_pct]
 	hypetrain_label.text = msg
 
@@ -172,7 +174,8 @@ func _followage(user: String) -> String:
 		var follower_info := await twitch_node.get_follower_info(channel_name, user)
 		if !follower_info.is_empty():
 			var followed_time_dict := Time.get_datetime_dict_from_datetime_string(str(follower_info["followed_at"]), true)
-			var msg := "%s has been following since %02d:%02d on %s %s/%s/%s. " % [user, followed_time_dict["hour"], followed_time_dict["minute"], weekdays[followed_time_dict["weekday"] as int], followed_time_dict["day"], followed_time_dict["month"], followed_time_dict["year"]]
+			var weekday: int = followed_time_dict["weekday"]
+			var msg := "%s has been following since %02d:%02d on %s %s/%s/%s. " % [user, followed_time_dict["hour"], followed_time_dict["minute"], weekdays[weekday], followed_time_dict["day"], followed_time_dict["month"], followed_time_dict["year"]]
 			var passed_time_dict := _get_elapsed_datetime(followed_time_dict, Time.get_datetime_dict_from_system())
 			var years: int = passed_time_dict["year"]
 			var months: int = passed_time_dict["month"]
@@ -205,11 +208,11 @@ func _followage(user: String) -> String:
 			return "%s is not following the channel" % user
 
 func _subbage(user: String) -> String:
-	var sub_info = await twitch_node.get_sub_info(channel_name, user)
+	var sub_info := await twitch_node.get_sub_info(channel_name, user)
 	if sub_info.is_empty():
 		return "They are not subbed"
 	else:
-		var tier: int = round(int(sub_info["tier"]) / 1000.)
+		var tier: int = round(sub_info["tier"] / 1000.)
 		if !sub_info["is_gift"]:
 			return "They are a tier %s sub" % tier
 		else:
@@ -241,15 +244,25 @@ func _scroll_down() -> void:
 
 func _get_elapsed_datetime(from: Dictionary, to: Dictionary) -> Dictionary:
 	var elapsed: Dictionary
-	var diff := _calc_diff(to["minute"] as int, from["minute"] as int, 60)
+	var to_unit: int = to["minute"]
+	var from_unit: int = from["minute"]
+	var diff := _calc_diff(to_unit, from_unit, 60)
 	elapsed["minute"] = diff[0]
-	diff = _calc_diff(to["hour"] as int, from["hour"] as int + diff[1], 24)
+	to_unit = to["hour"]
+	from_unit = from["hour"]
+	diff = _calc_diff(to_unit, from_unit + diff[1], 24)
 	elapsed["hour"] = diff[0]
-	diff = _calc_diff(to["day"] as int, from["day"] as int + diff[1], months_length[to["month"] - 1])
+	to_unit = to["day"]
+	from_unit = from["day"]
+	diff = _calc_diff(to_unit, from_unit + diff[1], months_length[to["month"] - 1])
 	elapsed["day"] = diff[0]
-	diff = _calc_diff(to["month"] as int, from["month"] as int + diff[1], 12)
+	to_unit = to["month"]
+	from_unit = from["month"]
+	diff = _calc_diff(to_unit, from_unit + diff[1], 12)
 	elapsed["month"] = diff[0]
-	elapsed["year"] = to["year"] - from["year"] - diff[1]
+	to_unit = to["year"]
+	from_unit = from["year"]
+	elapsed["year"] = to_unit - from_unit - diff[1]
 	return elapsed
 
 func _calc_diff(a: int, b: int, modulus: int) -> Array[int]:

@@ -870,7 +870,7 @@ func _store_credentials() -> void:
 func _load_credentials() -> bool:
 	if FileAccess.file_exists("user://twitch_credentials"):
 		var file := FileAccess.open("user://twitch_credentials", FileAccess.READ)
-		var encrypted_credentials = bytes_to_var(file.get_buffer(file.get_length()))
+		var encrypted_credentials := bytes_to_var(file.get_buffer(file.get_length()))
 		encrypted_client_id = encrypted_credentials["client_id"]
 		encrypted_channel_access_token = encrypted_credentials["channel_access_token"]
 		encrypted_user_access_token = encrypted_credentials["user_access_token"]
@@ -880,9 +880,9 @@ func _load_credentials() -> bool:
 	else:
 		return false
 
-func _init_key():
+func _init_key() -> void:
 	if key != null:
-		return key
+		return 
 	key = CryptoKey.new()
 	var err := key.load("user://encryption.key")
 	if err != 0:
