@@ -284,6 +284,8 @@ func _process_twitch_event(event_type: TwitchAPI.EventType, event_data: Dictiona
 			poll_ended.emit(event_data["broadcaster_user_name"], event_data["title"], choices, votes, event_data)
 		TwitchAPI.EventType.CHANNEL_POINTS_CUSTOM_REWARD_REDEMPTION_ADD:
 			reward_redeemed.emit(event_data["broadcaster_user_name"], event_data["user_name"], event_data["reward"]["title"], event_data["user_input"], event_data)
+		TwitchAPI.EventType.CHANNEL_POINTS_AUTOMATIC_REWARD_REDEMPTION_ADD:
+			reward_redeemed.emit(event_data["broadcaster_user_name"], event_data["user_name"], event_data["reward"]["type"], event_data["message"]["text"], event_data)
 		TwitchAPI.EventType.CHANNEL_INCOMING_RAID:
 			incoming_raid.emit(event_data["to_broadcaster_user_name"], event_data["from_broadcaster_user_name"], event_data["viewers"], event_data)
 		TwitchAPI.EventType.CHANNEL_OUTGOING_RAID:
