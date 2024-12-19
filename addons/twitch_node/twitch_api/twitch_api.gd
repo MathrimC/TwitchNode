@@ -505,7 +505,10 @@ func create_prediction(channel: String, prediction_title: String, prediction_out
 		for outcome in prediction_outcomes:
 			body["outcomes"].append({"title": outcome})
 		var request := await _execute_request(TwitchAPIRequest.APIOperation.CREATE_PREDICTION, "", body)
-		prediction_info = request.response_body["data"]
+		if request.response_code == 200:
+			prediction_info = request.response_body["data"][0]
+		else:
+			printerr("Can't create prediction. Perhaps another prediction is still active")
 	else:
 		printerr("Can't create prediction due to missing channel id")
 
