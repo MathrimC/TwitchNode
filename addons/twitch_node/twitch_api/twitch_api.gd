@@ -209,6 +209,7 @@ func connect_to_channel(channel: String) -> void:
 	if token_states["user"] == TwitchNode.TokenState.CHECKING:
 		await twitch_node.token_validated
 	if token_states["channel"] != TwitchNode.TokenState.VALID:
+		printerr("Can't connect to channel due to invalid channel access token")
 		return
 	if session_id == "":
 		_connect_twitch_websocket()
@@ -683,12 +684,13 @@ func _check_user_ids(usernames: Array[String]) -> bool:
 	if !missing_ids.is_empty():
 		var query_parameters: Dictionary = { "login": missing_ids }
 		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_USER_INFO, "", {}, query_parameters)
-		for user_info in request.response_body["data"]:
-			var login_name: String = user_info["login"]
-			var display_name: String = user_info["display_name"]
-			var id = user_info["id"]
-			user_list[login_name] = id
-			user_list[display_name] = id
+		if request.response_code == 200:
+			for user_info in request.response_body["data"]:
+				var login_name: String = user_info["login"]
+				var display_name: String = user_info["display_name"]
+				var id = user_info["id"]
+				user_list[login_name] = id
+				user_list[display_name] = id
 		for username in query_parameters["login"]:
 			if !user_list.has(username):
 				twitch_node.error_occured.emit(TwitchNode.ErrorCode.UNKNOWN_USER, {"username": username})
