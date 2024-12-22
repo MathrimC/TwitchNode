@@ -252,13 +252,13 @@ func _process_twitch_event(event_type: TwitchAPI.EventType, event_data: Dictiona
 		TwitchAPI.EventType.CHANNEL_FOLLOW:
 			new_follower.emit(event_data["broadcaster_user_name"], event_data["user_name"], event_data)
 		TwitchAPI.EventType.CHANNEL_SUB:
-			new_sub.emit(event_data["broadcaster_user_name"], event_data["user_name"], event_data)
+			new_sub.emit(event_data["broadcaster_user_name"], event_data["user_name"], int(event_data["tier"]) / 1000, event_data)
 		TwitchAPI.EventType.CHANNEL_SUB_MESSAGE:
-			resub.emit(event_data["broadcaster_user_name"], event_data["user_name"], event_data["tier"], event_data["streak_months"], event_data["duration_months"], event_data["cumulative_months"], event_data["message"]["text"], event_data)
+			resub.emit(event_data["broadcaster_user_name"], event_data["user_name"], int(event_data["tier"]) / 1000, event_data["streak_months"], event_data["duration_months"], event_data["cumulative_months"], event_data["message"]["text"], event_data)
 		TwitchAPI.EventType.CHANNEL_SUB_GIFT:
-			gift_subs.emit(event_data["broadcaster_user_name"], event_data["user_name"], event_data["tier"], event_data["total"], event_data)
+			gift_subs.emit(event_data["broadcaster_user_name"], event_data["user_name"], int(event_data["tier"]) / 1000, event_data["total"], event_data)
 		TwitchAPI.EventType.CHANNEL_SUB_END:
-			end_sub.emit(event_data["broadcaster_user_name"], event_data["user_name"], event_data["tier"], event_data)
+			end_sub.emit(event_data["broadcaster_user_name"], event_data["user_name"], int(event_data["tier"]) / 1000, event_data)
 		TwitchAPI.EventType.CHANNEL_VIP_ADD:
 			vip_added.emit(event_data["broadcaster_user_name"], event_data["user_name"], event_data)
 		TwitchAPI.EventType.CHANNEL_VIP_REMOVE:

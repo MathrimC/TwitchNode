@@ -730,7 +730,7 @@ func _rate_limit_loop() -> void:
 		rate_limit_remaining = min(rate_limit_remaining + 1, rate_limit)
 		while !request_queue.is_empty() && rate_limit_remaining > 0:
 			rate_limit_remaining -= 1
-			request_queue.pop_front().execute()
+			request_queue.pop_front().execute_request()
 		await get_tree().create_timer(1).timeout
 
 func _request_cleanup_loop() -> void:
