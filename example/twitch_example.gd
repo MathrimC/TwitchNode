@@ -21,6 +21,7 @@ func _ready() -> void:
 		twitch_node.new_chat_message.connect(on_new_chat_message)
 		twitch_node.new_follower.connect(on_new_follower)
 		twitch_node.new_sub.connect(on_new_sub)
+		twitch_node.resub.connect(on_resub)
 		twitch_node.end_sub.connect(on_end_sub)
 		twitch_node.gift_subs.connect(on_gift_subs)
 		twitch_node.vip_added.connect(on_vip_added)
@@ -35,6 +36,7 @@ func _ready() -> void:
 		twitch_node.hype_train_ended.connect(on_hype_train_ended)
 		twitch_node.stream_started.connect(on_stream_started)
 		twitch_node.stream_ended.connect(on_stream_ended)
+		twitch_node.ad_break_started.connect(on_ad_break_started)
 		_connect_to_channel()
 	else:
 		printerr("No channel name provided")
@@ -75,6 +77,9 @@ func on_new_follower(_channel: String, _follower: String, _event_data: Dictionar
 
 func on_new_sub(_channel: String, _subscriber: String, _tier: int, _event_data: Dictionary) -> void:
 	_add_label("New tier %s sub: %s" % [_tier, _subscriber])
+
+func on_resub(_channel: String, _subscriber: String, _tier: int, _streak: int, _duration: int, _cumulative: int, _message: String, _event_data: Dictionary) -> void:
+	_add_label("Tier %s resub by %s: %s months, %s" % [_tier, _subscriber, _cumulative, _message])
 
 func on_end_sub(_channel: String, _subscriber: String, _tier: int, _event_data: Dictionary) -> void:
 	_add_label("%s's tier %s sub has ended" % [_subscriber, _tier])
@@ -150,6 +155,11 @@ func on_stream_started(_channel: String, _event_data: Dictionary) -> void:
 func on_stream_ended(_channel: String, _event_data: Dictionary) -> void:
 	_add_label("%s is now offline" % _channel)
 
+func on_ad_break_started(_channel: String, _duration: int, _event_data: Dictionary) -> void:
+	twitch_node.send_chat_message(channel_name, bot_account_name, "Ads are starting BigSad")
+	await get_tree().create_timer(_duration).timeout
+	twitch_node.send_chat_message(channel_name, bot_account_name, "Ads are over! DinoDance")
+
 func process_command(_user: String, _message: String) -> void:
 	if _message.begins_with("!ping"):
 		twitch_node.send_chat_message(channel_name, bot_account_name, "Pong!")
@@ -169,6 +179,8 @@ func process_command(_user: String, _message: String) -> void:
 		msg += ". " + await _moddage(user)
 		msg += ". " + await _vippage(user) + "."
 		twitch_node.send_chat_message(channel_name, bot_account_name, msg)
+	if _message.begins_with("!ads"):
+		_ads(_user)
 
 func _followage(user: String) -> String:
 		var follower_info := await twitch_node.get_follower_info(channel_name, user)
@@ -229,6 +241,13 @@ func _vippage(user: String) -> String:
 		return "They are a vip"
 	else:
 		return "They are not a vip"
+
+func _ads(_user: String) -> void:
+	var ad_info := await twitch_node.get_ad_schedule(channel_name)
+	var ads_in_s: int = ad_info["next_ad_at"] - Time.get_unix_time_from_system()
+	var minutes: int = floori(ads_in_s / 60.)
+	var seconds: int = ads_in_s % 60
+	twitch_node.send_chat_message(channel_name, bot_account_name, "Ads will play in %s minutes and %s seconds" % [minutes, seconds])
 
 func _add_label(_text: String) -> void:
 	var label := RichTextLabel.new()

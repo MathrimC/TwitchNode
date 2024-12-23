@@ -1,7 +1,7 @@
 class_name TwitchAPIRequest
 extends HTTPRequest
 
-enum APIOperation { GET_USER_INFO, GET_GAMES, SUBSCRIBE_TO_EVENT, POST_CHAT_MESSAGE, GET_CHANNEL_INFO, MODIFY_CHANNEL_INFO, CREATE_POLL, SEND_SHOUTOUT, BAN_USER, GET_VIPS, ADD_VIP, GET_SUBS, GET_FOLLOWERS, GET_MODERATORS, CREATE_PREDICTION, END_PREDICTION, START_RAID, CANCEL_RAID, WARN_USER, CREATE_CUSTOM_REWARD, UPDATE_REDEMPTION_STATUS, SEND_CHAT_ANNOUNCEMENT }
+enum APIOperation { GET_USER_INFO, GET_GAMES, SUBSCRIBE_TO_EVENT, POST_CHAT_MESSAGE, GET_CHANNEL_INFO, MODIFY_CHANNEL_INFO, CREATE_POLL, SEND_SHOUTOUT, BAN_USER, GET_VIPS, ADD_VIP, GET_SUBS, GET_FOLLOWERS, GET_MODERATORS, CREATE_PREDICTION, END_PREDICTION, START_RAID, CANCEL_RAID, WARN_USER, CREATE_CUSTOM_REWARD, UPDATE_REDEMPTION_STATUS, SEND_CHAT_ANNOUNCEMENT, START_COMMERCIAL, GET_AD_SCHEDULE, SNOOZE_NEXT_AD }
 enum ErrorCode { OK, INVALID_TOKEN, HTTP_ERROR, REQUEST_ERROR }
 
 signal twitch_api_request_completed(request: TwitchAPIRequest, result: Result)
@@ -118,7 +118,22 @@ const api_operations: Dictionary = {
 		"endpoint": "chat/announcements",
 		"scope": "moderator:manage:announcements",
 		"method": HTTPClient.METHOD_POST
-	}
+	},
+	APIOperation.START_COMMERCIAL: {
+		"endpoint": "channels/commercial",
+		"scope": "channel:edit:commercial",
+		"method": HTTPClient.METHOD_POST
+	},
+	APIOperation.GET_AD_SCHEDULE: {
+		"endpoint": "channels/ads",
+		"scope": "channel:read:ads",
+		"method": HTTPClient.METHOD_GET
+	},
+	APIOperation.SNOOZE_NEXT_AD: {
+		"endpoint": "channels/ads/schedule/snooze",
+		"scope": "channel:manage:ads",
+		"method": HTTPClient.METHOD_POST
+	},
 }
 
 var account: String

@@ -4,7 +4,7 @@ class_name TwitchAPI
 extends Node
 
 # enum APIOperation { GET_USER_INFO, SUBSCRIBE_TO_EVENT, POST_CHAT_MESSAGE, GET_CHANNEL_INFO, MODIFY_CHANNEL_INFO, CREATE_POLL, SEND_SHOUTOUT, BAN_USER, GET_VIPS, ADD_VIP, GET_SUBS, CREATE_PREDICTION, END_PREDICTION, START_RAID, CANCEL_RAID, WARN_USER }
-enum EventType { CHANNEL_CHAT_MESSAGE, CHANNEL_UPDATE, CHANNEL_FOLLOW, CHANNEL_SUB, CHANNEL_SUB_END, CHANNEL_SUB_GIFT, CHANNEL_SUB_MESSAGE, CHANNEL_VIP_ADD, CHANNEL_VIP_REMOVE, CHANNEL_INCOMING_RAID, CHANNEL_OUTGOING_RAID, CHANNEL_POLL_BEGIN, CHANNEL_POLL_PROGRESS, CHANNEL_POLL_END, CHANNEL_PREDICTION_BEGIN, CHANNEL_PREDICTION_PROGRESS, CHANNEL_PREDICTION_LOCK, CHANNEL_PREDICTION_END, CHANNEL_POINTS_AUTOMATIC_REWARD_REDEMPTION_ADD, CHANNEL_POINTS_CUSTOM_REWARD_REDEMPTION_ADD, CHANNEL_CHEER, HYPE_TRAIN_BEGIN, HYPE_TRAIN_PROGRESS, HYPE_TRAIN_END, STREAM_ONLINE, STREAM_OFFLINE }
+enum EventType { CHANNEL_CHAT_MESSAGE, CHANNEL_UPDATE, CHANNEL_FOLLOW, CHANNEL_SUB, CHANNEL_SUB_END, CHANNEL_SUB_GIFT, CHANNEL_SUB_MESSAGE, CHANNEL_VIP_ADD, CHANNEL_VIP_REMOVE, CHANNEL_INCOMING_RAID, CHANNEL_OUTGOING_RAID, CHANNEL_POLL_BEGIN, CHANNEL_POLL_PROGRESS, CHANNEL_POLL_END, CHANNEL_PREDICTION_BEGIN, CHANNEL_PREDICTION_PROGRESS, CHANNEL_PREDICTION_LOCK, CHANNEL_PREDICTION_END, CHANNEL_POINTS_AUTOMATIC_REWARD_REDEMPTION_ADD, CHANNEL_POINTS_CUSTOM_REWARD_REDEMPTION_ADD, CHANNEL_CHEER, HYPE_TRAIN_BEGIN, HYPE_TRAIN_PROGRESS, HYPE_TRAIN_END, STREAM_ONLINE, STREAM_OFFLINE, AD_BREAK_BEGIN }
 
 const base_uri := "https://api.twitch.tv/helix/"
 const websocket_uri: String = "wss://eventsub.wss.twitch.tv/ws"
@@ -168,7 +168,13 @@ const events: Dictionary = {
 		"scope": "",
 		"version": 1,
 		"condition": ["broadcaster_user_id"]
-	}
+	},
+	EventType.AD_BREAK_BEGIN : {
+		"type": "channel.ad_break.begin",
+		"scope": "channel:read:ads",
+		"version": 1,
+		"condition": ["broadcaster_user_id"]
+	},
 }
 
 signal websocket_connected()
@@ -596,6 +602,42 @@ func cancel_raid(channel: String) -> void:
 		_execute_request(TwitchAPIRequest.APIOperation.CANCEL_RAID, "", {}, query_parameters)
 	else:
 		printerr("Can't start raid due to missing channel id")
+
+func start_commercial(channel: String, length: int) -> void:
+	if await _check_user_ids([channel]):
+		var channel_id = user_list[channel]
+		var query_parameters := {
+			"broadcaster_id" : channel_id,
+			"length" : length
+		}
+		_execute_request(TwitchAPIRequest.APIOperation.START_COMMERCIAL, "", {}, query_parameters)
+	else:
+		printerr("Can't start ads due to missing channel id")
+
+func get_ad_schedule(channel: String) -> Dictionary:
+	if await _check_user_ids([channel]):
+		var channel_id = user_list[channel]
+		var query_parameters := {
+			"broadcaster_id" : channel_id,
+		}
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_AD_SCHEDULE, "", {}, query_parameters)
+		if !request.response_body.is_empty():
+			return request.response_body["data"][0]
+		else:
+			return {}
+	else:
+		printerr("Can't start ads due to missing channel id")
+		return {}
+
+func snooze_next_ad(channel: String) -> void:
+	if await _check_user_ids([channel]):
+		var channel_id = user_list[channel]
+		var query_parameters := {
+			"broadcaster_id" : channel_id,
+		}
+		_execute_request(TwitchAPIRequest.APIOperation.SNOOZE_NEXT_AD, "", {}, query_parameters)
+	else:
+		printerr("Can't start ads due to missing channel id")
 
 static func get_channel_scope() -> String:
 	var scopes: Array[String]

@@ -33,6 +33,7 @@ signal hype_train_progress(channel: String, level: int, event_data: Dictionary)
 signal hype_train_ended(channel: String, level: int, event_data: Dictionary)
 signal stream_started(channel: String, event_data: Dictionary)
 signal stream_ended(channel: String, event_data: Dictionary)
+signal ad_break_started(channel: String, duration_s: int, event_data: Dictionary)
 
 signal token_validated(account: String, token_state: TokenState)
 signal error_occured(error_code, error_info: Dictionary)
@@ -212,6 +213,16 @@ func start_raid(channel: String, raid_target: String) -> void:
 func cancel_raid(channel: String) -> void:
 	_twitch_api.cancel_raid(channel)
 
+func start_ads(channel: String, length: int) -> void:
+	_twitch_api.start_commercial(channel, length)
+
+## Resturn a dictionary with keys "next_ad_at", "last_ad_at", "duration" (length in seconds of upcoming ad break), "preroll_free_time" (in seconds), "snooze_count" (number of available snoozes), "snooze_refresh_at"
+func get_ad_schedule(channel: String) -> Dictionary:
+	return await _twitch_api.get_ad_schedule(channel)
+
+func snooze_next_ad(channel: String) -> void:
+	_twitch_api.snooze_next_ad(channel)
+
 func get_channel_auth_url( _redirect_url: String) -> String:
 	return _twitch_api.get_channel_auth_url(_redirect_url)
 
@@ -324,5 +335,7 @@ func _process_twitch_event(event_type: TwitchAPI.EventType, event_data: Dictiona
 			stream_started.emit(event_data["broadcaster_user_name"], event_data)
 		TwitchAPI.EventType.STREAM_OFFLINE:
 			stream_ended.emit(event_data["broadcaster_user_name"], event_data)
+		TwitchAPI.EventType.AD_BREAK_BEGIN:
+			ad_break_started.emit(event_data["broadcaster_user_name"], int(event_data["duration_seconds"]), event_data)
 		_:
 			printerr("Unkown twitch event recieved: %s" % event_type)

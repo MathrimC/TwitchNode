@@ -59,6 +59,5 @@ text = "auth settings"
 
 [node name="TwitchNode" type="Node" parent="."]
 script = ExtResource("2_g4gm0")
-rate_limit = null
 
 [connection signal="pressed" from="PanelContainer/MarginContainer/Button" to="." method="on_auth_button_pressed"]
