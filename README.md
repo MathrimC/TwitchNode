@@ -2,11 +2,11 @@
 TwitchNode is a Godot library for easy interfacing with Twitch from GDScript. It can be used for developing Twitch integrated games, chatbots, chat applications or stream overlays.
 
 ## Features
-- Provides GDScript signals for incoming chat messages, bits, channel info updates, followers, subs, hype trains, raids, polls, predictions, channel points redemptions and vip changes.
-- Provides GDScript functions for sending chat messages, updating channel info, sending shoutouts, creating polls, creating and updating predictions, warning/banning users, adding vips, creating rewards, sending announcements, starting raids, getting subs, followers and vips info
+- Provides GDScript signals for incoming chat messages, bits, channel info updates, followers, subs, hype trains, raids, polls, predictions, channel points redemptions, vip changes and ads.
+- Provides GDScript functions for sending chat messages, updating channel info, sending shoutouts, creating polls, creating and updating predictions, warning/banning users, adding vips, creating rewards, sending announcements, starting raids, getting subs, followers and vips info, getting ad info, and starting and snoozing ads
 - Track channel events with a channel access token and send chat messages with a bot account access token
 - Supports the use of user display names as input parameters (automatic translation to userids)
-- Auth window scene that can be (partly) reused in your own project, for easily generating new access tokens using the Implicit grant flow. Launches a local http server to capture the token after redirect, so no copy-pasting needed by the user.
+- Auth window scene that can be (partly) reused in your own project, for easy generation of new access tokens using the Implicit grant flow. Launches a local http server to capture the token after redirect, so no copy-pasting needed by the user.
 - No unencrypted tokens in variables. This makes the addon safe for streaming while developing and debugging
 - Encrypted storage of client id and tokens in the project user directory
 - Built in rate limiting to prevent you from getting into trouble when accidentally launching too many requests
