@@ -24,7 +24,6 @@ var incoming_token_type: String
 var server_status = INACTIVE
 
 func _ready() -> void:
-	redirect_server.listen(redirect_port, redirect_bind_address)
 	if twitch_node == null:
 		twitch_node = TwitchNode.new()
 		add_child(twitch_node)
