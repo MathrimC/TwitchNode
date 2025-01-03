@@ -17,10 +17,13 @@ signal gift_subs(channel: String, gifter: String, tier: int, amount: int, event_
 signal vip_added(channel: String, user: String, event_data: Dictionary)
 signal vip_removed(channel: String, user: String, event_data: Dictionary)
 signal poll_started(channel: String, poll_title: String, poll_choices: Array[String], event_data: Dictionary)
-signal poll_progress(channel: String, poll_title: String, poll_choices: Array[String], poll_votes: Array[String], event_data: String)
+signal poll_progress(channel: String, poll_title: String, poll_choices: Array[String], poll_votes: Array[String], event_data: Dictionary)
 signal poll_ended(channel: String, poll_title: String, poll_choices: Array[String], poll_votes: Array[int], event_data: Dictionary)
 signal prediction_started(channel: String, prediction_title: String, prediction_outcomes: Array[String], event_data: Dictionary)
-signal prediction_progress(channel: String, prediction_title: String, event_data: String)
+## Parameter event_data contains keys "title", "outcomes", "started_at", "locks_at" and more. [br]
+## Element event_data["outcomes"] contains a dictionary with keys "id", "title", "color", "users", "channel_points" and "top_predictors". [br]
+## Element event_data["outcomes"]["top_predictors"] contains an array of dictionaries, every element is a dictoinary that contains keys "user_name", "channel_points_used", "channel_points_won" and more.
+signal prediction_progress(channel: String, prediction_title: String, event_data: Dictionary)
 signal prediction_locked(channel: String, prediction_title, event_data: Dictionary)
 signal prediction_resolved(channel: String, prediction_title: String, prediction_outcome: String, event_data: Dictionary)
 signal prediction_canceled(channel: String, prediction_title: String, event_data: Dictionary)
