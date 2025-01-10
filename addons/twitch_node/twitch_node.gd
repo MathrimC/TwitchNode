@@ -195,19 +195,37 @@ func resolve_prediction(channel: String, outcome: String) -> void:
 func cancel_prediction(channel: String) -> void:
 	_twitch_api.cancel_prediction(channel)
 
-func create_custom_reward(channel: String, title: String, cost: int, explanation: String = "", is_enabled: bool = true, is_user_input_required: bool = false, max_per_stream: int = 0, max_per_user: int = 0, global_cooldown_s: int = 0, skip_request_queue: bool = false, background_color: Color = Color.WHITE):
-	_twitch_api.create_custom_reward(channel, title, cost, explanation, is_enabled, is_user_input_required, max_per_stream, max_per_user, global_cooldown_s, skip_request_queue, background_color)
+## Returns an array of dictionaries, each one containing info about a reward
+## Returns all rewards if ids argument is empty
+func get_custom_rewards(channel: String, ids: Array[String] = [], only_manageable: bool = false) -> Array:
+	return await _twitch_api.get_custom_rewards(channel, ids, only_manageable)
+
+## Returns the reward id
+func create_custom_reward(channel: String, title: String, cost: int, explanation: String = "", is_enabled: bool = true, is_user_input_required: bool = false, max_per_stream: int = 0, max_per_user: int = 0, global_cooldown_s: int = 0, skip_request_queue: bool = false, background_color: Color = Color.WHITE) -> String:
+	return await _twitch_api.create_custom_reward(channel, title, cost, explanation, is_enabled, is_user_input_required, max_per_stream, max_per_user, global_cooldown_s, skip_request_queue, background_color)
+
+## Only works for custom redemptions created by the same applications. Use the reward id returned by create_custom_reward
+func update_custom_reward(channel: String, reward_id: String, title: String = "", cost: int = 0, explanation: String = "", is_user_input_required: bool = false, is_enabled: bool = true, is_paused: bool = false, max_per_stream: int = 0, max_per_user: int = 0, global_cooldown_s: int = 0, skip_request_queue: bool = false, background_color: Color = Color.WHITE) -> void:
+	_twitch_api.update_custom_reward(channel, reward_id, title, cost, explanation, is_user_input_required, is_enabled, is_paused, max_per_stream, max_per_user, global_cooldown_s, skip_request_queue, background_color)
+
+## Only works for custom redemptions created by the same applications. Use the reward id returned by create_custom_reward
+func enable_custom_reward(channel: String, reward_id: String, is_enabled: bool) -> void:
+	_twitch_api.enable_custom_reward(channel, reward_id, is_enabled)
+
+## Only works for custom redemptions created by the same applications. Use the reward id returned by create_custom_reward
+func pause_custom_reward(channel: String, reward_id: String, is_paused: bool) -> void:
+	_twitch_api.pause_custom_reward(channel, reward_id, is_paused)
 
 ## Only works for custom redemptions created by the same application
-func cancel_channel_redemption(channel: String, reward_id: String, redemption_id: String):
+func cancel_channel_redemption(channel: String, reward_id: String, redemption_id: String) -> void:
 	_twitch_api.update_redemption_status(channel, reward_id, redemption_id, "CANCELED")
 
 ## Only works for custom redemptions created by the same application
-func fulfill_channel_redemption(channel: String, reward_id: String, redemption_id: String):
+func fulfill_channel_redemption(channel: String, reward_id: String, redemption_id: String) -> void:
 	_twitch_api.update_redemption_status(channel, reward_id, redemption_id, "FULFILLED")
 
 ## Color needs to be blue, green, orange or purple
-func send_chat_announcement(channel: String, username: String, message: String, color: String):
+func send_chat_announcement(channel: String, username: String, message: String, color: String) -> void:
 	_twitch_api.send_chat_announcement(channel, username, message, color)
 
 func start_raid(channel: String, raid_target: String) -> void:

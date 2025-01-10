@@ -295,7 +295,7 @@ func send_shoutout(channel: String, shoutout_channel: String) -> void:
 	else:
 		printerr("Can't send shoutout to %s due to missing user ids" % shoutout_channel)
 
-func create_custom_reward(channel: String, title: String, cost: int, explanation: String, is_enabled: bool = true, is_user_input_required: bool = false, max_per_stream: int = 0, max_per_user: int = 0, global_cooldown_s: int = 0, skip_request_queue: bool = false, background_color: Color = Color.WHITE):
+func create_custom_reward(channel: String, title: String, cost: int, explanation: String, is_enabled: bool = true, is_user_input_required: bool = false, max_per_stream: int = 0, max_per_user: int = 0, global_cooldown_s: int = 0, skip_request_queue: bool = false, background_color: Color = Color.WHITE) -> String:
 	if await _check_user_ids([channel]):
 		var channel_id = user_list.get(channel, "")
 		var query_parameters := {
@@ -310,7 +310,7 @@ func create_custom_reward(channel: String, title: String, cost: int, explanation
 			"should_redemption_skip_request_queue": skip_request_queue
 		}
 		if background_color != Color.WHITE:
-			body["background_color"] = "#%s" % background_color.to_html()
+			body["background_color"] = "#%s" % background_color.to_html(false)
 		if max_per_stream > 0:
 			body["is_max_per_stream_enabled"] = true
 			body["max_per_stream"] = max_per_stream
@@ -320,7 +320,103 @@ func create_custom_reward(channel: String, title: String, cost: int, explanation
 		if global_cooldown_s > 0:
 			body["is_global_cooldown_enabled"] = true
 			body["global_cooldown_seconds"] = global_cooldown_s
-		_execute_request(TwitchAPIRequest.APIOperation.CREATE_CUSTOM_REWARD, "", body, query_parameters)
+		var result := await _execute_request(TwitchAPIRequest.APIOperation.CREATE_CUSTOM_REWARD, "", body, query_parameters)
+		if !result.response_body.is_empty():
+			return result.response_body["data"][0]["id"]
+		else:
+			return ""
+	else:
+		printerr("Can't create reward due to missing channel id")
+		return ""
+
+func get_custom_rewards(channel: String, ids: Array[String] = [], only_manageable: bool = false) -> Array:
+	if await _check_user_ids([channel]):
+		var channel_id = user_list.get(channel, "")
+		var query_parameters := {
+			"broadcaster_id": channel_id,
+			"id": ids,
+			"only_manageable": only_manageable
+		}
+		var result := await _execute_request(TwitchAPIRequest.APIOperation.GET_CUSTOM_REWARDS, "", {}, query_parameters)
+		if !result.response_body.is_empty():
+			return result.response_body["data"]
+		else:
+			return []
+	else:
+		return []
+
+func update_custom_reward(channel: String, reward_id: String, title: String = "", cost: int = 0, explanation: String = "", is_user_input_required: bool = false, is_enabled: bool = true, is_paused: bool = false, max_per_stream: int = 0, max_per_user: int = 0, global_cooldown_s: int = 0, skip_request_queue: bool = false, background_color: Color = Color.WHITE) -> void:
+	var channel_id = user_list.get(channel, "")
+	var rewards := await get_custom_rewards(channel, [reward_id], true)
+
+	if !rewards.is_empty() && await _check_user_ids([channel]):
+		var reward_info = rewards[0]
+		var query_parameters := {
+			"broadcaster_id": channel_id,
+			"id": reward_id
+		}
+		var body := {}
+		if reward_info["title"] != title:
+			body["title"] = title
+		if reward_info["prompt"] != explanation:
+			body["prompt"] = explanation
+		if reward_info["cost"] != cost:
+			body["cost"] = cost
+		if reward_info["background_color"] != background_color.to_html(false):
+			body["background_color"] = "#%s" % background_color.to_html(false)
+		if reward_info["is_enabled"] != is_enabled:
+			body["is_enabled"] = is_enabled
+		if reward_info["is_user_input_required"] != is_user_input_required:
+			body["is_user_input_required"] = is_user_input_required
+		var is_max_per_stream_enabled: bool = (max_per_stream > 0)
+		if reward_info["max_per_stream_setting"]["is_enabled"] != is_max_per_stream_enabled:
+			body["is_max_per_stream_enabled"] = is_max_per_stream_enabled
+		if reward_info["max_per_stream_setting"]["max_per_stream"] != max_per_stream:
+			body["max_per_stream"] = max_per_stream
+		var is_max_per_user_enabled: bool = (max_per_user > 0)
+		if reward_info["max_per_user_per_stream_setting"]["is_enabled"] != is_max_per_user_enabled:
+			body["is_max_per_user_per_stream_enabled"] = is_max_per_user_enabled
+		if reward_info["max_per_user_per_stream_setting"]["max_per_user_per_stream"] != max_per_user:
+			body["max_per_user_per_stream"] = max_per_user
+		var is_global_cooldown_enabled: bool = (global_cooldown_s > 0)
+		if reward_info["global_cooldown_setting"]["is_enabled"] != is_global_cooldown_enabled:
+			body["is_global_cooldown_enabled"] = is_global_cooldown_enabled
+		if reward_info["global_cooldown_setting"]["global_cooldown_seconds"] != global_cooldown_s:
+			body["global_cooldown_seconds"] = global_cooldown_s
+		if reward_info["is_paused"] != is_paused:
+			body["is_paused"] = is_paused
+		if reward_info["should_redemptions_skip_request_queue"] != skip_request_queue:
+			body["should_redemptions_skip_request_queue"] = skip_request_queue
+		print(body)
+		_execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, "", body, query_parameters)
+	else:
+		printerr("Can't create reward due to missing channel id")
+
+func enable_custom_reward(channel: String, reward_id: String, is_enabled = false) -> void:
+	if await _check_user_ids([channel]):
+		var channel_id = user_list.get(channel, "")
+		var query_parameters := {
+			"broadcaster_id": channel_id,
+			"id": reward_id
+		}
+		var body := {
+			"is_enabled": is_enabled,
+		}
+		_execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, "", body, query_parameters)
+	else:
+		printerr("Can't create reward due to missing channel id")
+
+func pause_custom_reward(channel: String, reward_id: String, is_paused = false) -> void:
+	if await _check_user_ids([channel]):
+		var channel_id = user_list.get(channel, "")
+		var query_parameters := {
+			"broadcaster_id": channel_id,
+			"id": reward_id
+		}
+		var body := {
+			"is_paused": is_paused,
+		}
+		_execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, "", body, query_parameters)
 	else:
 		printerr("Can't create reward due to missing channel id")
 
