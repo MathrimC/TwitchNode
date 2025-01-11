@@ -200,6 +200,14 @@ func cancel_prediction(channel: String) -> void:
 func get_custom_rewards(channel: String, ids: Array[String] = [], only_manageable: bool = false) -> Array:
 	return await _twitch_api.get_custom_rewards(channel, ids, only_manageable)
 
+func get_reward_id(channel: String, title: String) -> String:
+	var rewards := await _twitch_api.get_custom_rewards(channel)
+	for reward in rewards:
+		if title == reward["title"]:
+			return reward["id"]
+	printerr("Can't find reward id of reward with title %s" % title)
+	return ""
+
 ## Returns the reward id
 func create_custom_reward(channel: String, title: String, cost: int, explanation: String = "", is_enabled: bool = true, is_user_input_required: bool = false, max_per_stream: int = 0, max_per_user: int = 0, global_cooldown_s: int = 0, skip_request_queue: bool = false, background_color: Color = Color.WHITE) -> String:
 	return await _twitch_api.create_custom_reward(channel, title, cost, explanation, is_enabled, is_user_input_required, max_per_stream, max_per_user, global_cooldown_s, skip_request_queue, background_color)

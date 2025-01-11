@@ -323,8 +323,11 @@ func create_custom_reward(channel: String, title: String, cost: int, explanation
 		var result := await _execute_request(TwitchAPIRequest.APIOperation.CREATE_CUSTOM_REWARD, "", body, query_parameters)
 		if !result.response_body.is_empty():
 			return result.response_body["data"][0]["id"]
+		elif result.response_code == 400:
+			printerr("Reward creation failed. Maybe another reward with the same title already exists")
 		else:
-			return ""
+			printerr("Reward creation failed. Return code %s" % result.response_code)
+		return ""
 	else:
 		printerr("Can't create reward due to missing channel id")
 		return ""
@@ -389,8 +392,10 @@ func update_custom_reward(channel: String, reward_id: String, title: String = ""
 			body["should_redemptions_skip_request_queue"] = skip_request_queue
 		print(body)
 		_execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, "", body, query_parameters)
+	elif rewards.is_empty():
+		printerr("Reward update failed: can't find reward with id %s" % reward_id)
 	else:
-		printerr("Can't create reward due to missing channel id")
+		printerr("Can't update reward due to missing channel id")
 
 func enable_custom_reward(channel: String, reward_id: String, is_enabled = false) -> void:
 	if await _check_user_ids([channel]):
