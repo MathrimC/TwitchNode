@@ -245,12 +245,13 @@ func cancel_raid(channel: String) -> void:
 func start_ads(channel: String, length: int) -> void:
 	_twitch_api.start_commercial(channel, length)
 
-## Resturn a dictionary with keys "next_ad_at", "last_ad_at", "duration" (length in seconds of upcoming ad break), "preroll_free_time" (in seconds), "snooze_count" (number of available snoozes), "snooze_refresh_at"
+## Resturns a dictionary with keys "next_ad_at", "last_ad_at", "duration" (length in seconds of upcoming ad break), "preroll_free_time" (in seconds), "snooze_count" (number of available snoozes), "snooze_refresh_at"
 func get_ad_schedule(channel: String) -> Dictionary:
 	return await _twitch_api.get_ad_schedule(channel)
 
-func snooze_next_ad(channel: String) -> void:
-	_twitch_api.snooze_next_ad(channel)
+## Returns a dictionary with keys "snooze_count", "snooze_refresh_at" and "next_ad_at"
+func snooze_next_ad(channel: String) -> Dictionary:
+	return await _twitch_api.snooze_next_ad(channel)
 
 func get_channel_auth_url( _redirect_url: String) -> String:
 	return _twitch_api.get_channel_auth_url(_redirect_url)

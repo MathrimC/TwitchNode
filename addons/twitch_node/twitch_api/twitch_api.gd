@@ -730,15 +730,20 @@ func get_ad_schedule(channel: String) -> Dictionary:
 		printerr("Can't start ads due to missing channel id")
 		return {}
 
-func snooze_next_ad(channel: String) -> void:
+func snooze_next_ad(channel: String) -> Dictionary:
 	if await _check_user_ids([channel]):
 		var channel_id = user_list[channel]
 		var query_parameters := {
 			"broadcaster_id" : channel_id,
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.SNOOZE_NEXT_AD, "", {}, query_parameters)
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.SNOOZE_NEXT_AD, "", {}, query_parameters)
+		if !request.response_body.is_empty():
+			return request.response_body["data"][0]
+		else:
+			return {}
 	else:
-		printerr("Can't start ads due to missing channel id")
+		printerr("Can't snooze ads due to missing channel id")
+		return {}
 
 static func get_channel_scope() -> String:
 	var scopes: Array[String]
