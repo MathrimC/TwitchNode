@@ -591,27 +591,30 @@ func create_poll(channel: String, poll_title: String, poll_choices: Array[String
 		var channel_id = user_list[channel]
 		var body := { 
 			"broadcaster_id": channel_id, 
-			"title": poll_title, 
+			"title": poll_title.left(60), 
 			"choices": [],
 			"duration": poll_duration,
 		}
 		for choice: String in poll_choices:
-			body["choices"].append({ "title" : choice})
+			body["choices"].append({ "title" : choice.left(25)})
 		_execute_request(TwitchAPIRequest.APIOperation.CREATE_POLL, "", body)
 	else:
 		printerr("Can't create poll due to missing channel id")
 
 func create_prediction(channel: String, prediction_title: String, prediction_outcomes: Array[String], prediction_duration: int) -> void:
+	if prediction_outcomes.size() > 10:
+		printerr("Can't create prediction with more than 10 outcomes")
+		return
 	if await _check_user_ids([channel]):
 		var channel_id = user_list[channel]
 		var body := {
 			"broadcaster_id" : channel_id,
-			"title" : prediction_title,
+			"title" : prediction_title.left(45),
 			"outcomes": [],
 			"prediction_window" : prediction_duration,
 		}
 		for outcome in prediction_outcomes:
-			body["outcomes"].append({"title": outcome})
+			body["outcomes"].append({"title": outcome.left(25)})
 		var request := await _execute_request(TwitchAPIRequest.APIOperation.CREATE_PREDICTION, "", body)
 		if request.response_code == 200:
 			prediction_info = request.response_body["data"][0]
