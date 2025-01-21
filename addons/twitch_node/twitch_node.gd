@@ -253,6 +253,9 @@ func get_ad_schedule(channel: String) -> Dictionary:
 func snooze_next_ad(channel: String) -> Dictionary:
 	return await _twitch_api.snooze_next_ad(channel)
 
+func get_streams(broadcasters: Array[String], game_ids: Array[String] = [], live_only: bool = false, languages: Array[String] = ["en"]) -> Array:
+	return await _twitch_api.get_streams(broadcasters, game_ids, live_only, languages)
+
 func get_channel_auth_url( _redirect_url: String) -> String:
 	return _twitch_api.get_channel_auth_url(_redirect_url)
 

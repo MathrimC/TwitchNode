@@ -244,7 +244,7 @@ func get_channel_info(channel: String) -> Dictionary:
 			"broadcaster_id": channel_id
 		}
 		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_CHANNEL_INFO, "", {}, query_parameters)
-		if request.response_body["data"].size() > 0:
+		if request.response_body.get("data",[]).size() > 0:
 			return request.response_body["data"][0]
 		else:
 			twitch_node.error_occured.emit(TwitchNode.ErrorCode.BAD_INPUT, {"message" : "Channel info not found for %s" % channel})
@@ -280,6 +280,30 @@ func modify_channel_info(channel: String, title: String, category: String = "", 
 		_execute_request(TwitchAPIRequest.APIOperation.MODIFY_CHANNEL_INFO, "", body, query_parameters)
 	else:
 		printerr("Can't update channel info due to missing channel id")
+	
+func get_streams(broadcasters: Array[String], game_ids: Array[String] = [], live_only: bool = false, languages: Array[String] = ["en"]) -> Array:
+	if await _check_user_ids(broadcasters):
+		var user_ids: Array[String]
+		for broadcaster in broadcasters:
+			user_ids.append(user_list.get(broadcaster,""))
+		var query_parameters := {
+			"user_id": user_ids,
+			"game_id": game_ids,
+			"type": "live" if live_only else "all",
+			"language": languages,
+			"first": 100
+		}
+		print(query_parameters)
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_STREAMS, "", {}, query_parameters)
+		if !request.response_body.is_empty():
+			return request.response_body["data"]
+		else:
+			twitch_node.error_occured.emit(TwitchNode.ErrorCode.BAD_INPUT, {"message" : "Error getting streams from Twitch"})
+			printerr("Error getting streams from Twitch")
+			return []
+	else:
+		printerr("Can't get streams due to invalide broadcaster name")
+		return []
 
 func send_shoutout(channel: String, shoutout_channel: String) -> void:
 	if await _check_user_ids([channel, shoutout_channel]):
