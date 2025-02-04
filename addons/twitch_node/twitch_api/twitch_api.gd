@@ -210,9 +210,9 @@ func _ready() -> void:
 	_request_cleanup_loop()
 
 func connect_to_channel(channel: String) -> void:
-	if token_states["channel"] == TwitchNode.TokenState.CHECKING:
+	while token_states["channel"] == TwitchNode.TokenState.CHECKING:
 		await twitch_node.token_validated
-	if token_states["user"] == TwitchNode.TokenState.CHECKING:
+	while token_states["user"] == TwitchNode.TokenState.CHECKING:
 		await twitch_node.token_validated
 	if token_states["channel"] != TwitchNode.TokenState.VALID:
 		printerr("Can't connect to channel due to invalid channel access token")
