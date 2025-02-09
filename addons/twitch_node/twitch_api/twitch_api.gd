@@ -199,12 +199,15 @@ var encrypted_credentials: Dictionary
 var token_states: Dictionary
 var key: CryptoKey
 
-@onready var crypto: Crypto = Crypto.new()
+var crypto: Crypto
 
-func _ready() -> void:
+func _enter_tree():
 	rate_limit = twitch_node.rate_limit
 	rate_limit_remaining = twitch_node.rate_limit
+	crypto = Crypto.new()
 	_init_credentials()
+
+func _ready() -> void:
 	_validation_loop()
 	_rate_limit_loop()
 	_request_cleanup_loop()
@@ -293,7 +296,6 @@ func get_streams(broadcasters: Array[String], game_ids: Array[String] = [], live
 			"language": languages,
 			"first": 100
 		}
-		print(query_parameters)
 		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_STREAMS, "", {}, query_parameters)
 		if !request.response_body.is_empty():
 			return request.response_body["data"]
@@ -414,7 +416,6 @@ func update_custom_reward(channel: String, reward_id: String, title: String = ""
 			body["is_paused"] = is_paused
 		if reward_info["should_redemptions_skip_request_queue"] != skip_request_queue:
 			body["should_redemptions_skip_request_queue"] = skip_request_queue
-		print(body)
 		_execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, "", body, query_parameters)
 	elif rewards.is_empty():
 		printerr("Reward update failed: can't find reward with id %s" % reward_id)
@@ -1030,7 +1031,7 @@ func set_credentials(client_id: String, channel_token: String, user_token: Strin
 
 func _init_credentials() -> bool:
 	_init_key()
-	encrypted_credentials["version"] = "0.1"
+	encrypted_credentials["version"] = "0.2"
 	encrypted_credentials["client_id"] = []
 	encrypted_credentials["channel"] = []
 	encrypted_credentials["user"] = []
@@ -1038,12 +1039,21 @@ func _init_credentials() -> bool:
 	return !encrypted_credentials["client_id"].is_empty() && !encrypted_credentials["channel"].is_empty() && !encrypted_credentials["user"].is_empty()
 
 func _store_credentials() -> void:
-	var file = FileAccess.open("user://twitch_credentials", FileAccess.WRITE)
+	if !DirAccess.dir_exists_absolute("user://TwitchNode"):
+		DirAccess.make_dir_absolute("user://TwitchNode")
+	var file = FileAccess.open("user://TwitchNode/twitch_credentials", FileAccess.WRITE)
 	file.store_buffer(var_to_bytes(encrypted_credentials))
 
 func _load_credentials() -> bool:
 	if FileAccess.file_exists("user://twitch_credentials"):
 		var file := FileAccess.open("user://twitch_credentials", FileAccess.READ)
+		encrypted_credentials = bytes_to_var(file.get_buffer(file.get_length()))
+		encrypted_credentials["version"] = "0.2"
+		_store_credentials()
+		DirAccess.remove_absolute("user://twitch_credentials")
+		return true
+	elif FileAccess.file_exists("user://TwitchNode/twitch_credentials"):
+		var file := FileAccess.open("user://TwitchNode/twitch_credentials", FileAccess.READ)
 		encrypted_credentials = bytes_to_var(file.get_buffer(file.get_length()))
 		return true
 	else:
@@ -1053,7 +1063,14 @@ func _init_key() -> void:
 	if key != null:
 		return 
 	key = CryptoKey.new()
-	var err := key.load("user://encryption.key")
+	if !DirAccess.dir_exists_absolute("user://TwitchNode"):
+		DirAccess.make_dir_absolute("user://TwitchNode")
+	if FileAccess.file_exists("user://encryption.key"):
+		if !DirAccess.dir_exists_absolute("user://TwitchNode"):
+			DirAccess.make_dir_absolute("user://TwitchNode")
+		DirAccess.copy_absolute("user://encryption.key", "user://TwitchNode/encryption.key")
+		DirAccess.remove_absolute("user://encryption.key")
+	var err := key.load("user://TwitchNode/encryption.key")
 	if err != 0:
 		key = crypto.generate_rsa(4096)
-		key.save("user://encryption.key")
+		key.save("user://TwitchNode/encryption.key")
