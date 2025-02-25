@@ -1,7 +1,7 @@
 class_name TwitchAPIRequest
 extends HTTPRequest
 
-enum APIOperation { GET_USER_INFO, GET_GAMES, SUBSCRIBE_TO_EVENT, POST_CHAT_MESSAGE, GET_CHANNEL_INFO, MODIFY_CHANNEL_INFO, GET_STREAMS, CREATE_POLL, SEND_SHOUTOUT, BAN_USER, GET_VIPS, ADD_VIP, GET_SUBS, GET_FOLLOWERS, GET_MODERATORS, CREATE_PREDICTION, END_PREDICTION, START_RAID, CANCEL_RAID, WARN_USER, GET_CUSTOM_REWARDS, CREATE_CUSTOM_REWARD, UPDATE_CUSTOM_REWARD, UPDATE_REDEMPTION_STATUS, SEND_CHAT_ANNOUNCEMENT, START_COMMERCIAL, GET_AD_SCHEDULE, SNOOZE_NEXT_AD }
+enum APIOperation { GET_USER_INFO, GET_GAMES, SUBSCRIBE_TO_EVENT, POST_CHAT_MESSAGE, GET_CHANNEL_INFO, MODIFY_CHANNEL_INFO, GET_STREAMS, CREATE_POLL, SEND_SHOUTOUT, BAN_USER, GET_VIPS, ADD_VIP, REMOVE_VIP, GET_SUBS, GET_FOLLOWERS, GET_MODERATORS, CREATE_PREDICTION, END_PREDICTION, START_RAID, CANCEL_RAID, WARN_USER, GET_CUSTOM_REWARDS, CREATE_CUSTOM_REWARD, UPDATE_CUSTOM_REWARD, UPDATE_REDEMPTION_STATUS, SEND_CHAT_ANNOUNCEMENT, START_COMMERCIAL, GET_AD_SCHEDULE, SNOOZE_NEXT_AD }
 enum ErrorCode { OK, INVALID_TOKEN, HTTP_ERROR, REQUEST_ERROR }
 
 signal twitch_api_request_completed(request: TwitchAPIRequest, result: Result)
@@ -61,13 +61,18 @@ const api_operations: Dictionary = {
 	},
 	APIOperation.GET_VIPS: {
 		"endpoint": "channels/vips",
-		"scope": "channel:manage:vips",
+		"scope": "channel:read:vips",
 		"method": HTTPClient.METHOD_GET
 	},
 	APIOperation.ADD_VIP: {
 		"endpoint": "channels/vips",
 		"scope": "channel:manage:vips",
 		"method": HTTPClient.METHOD_POST
+	},
+	APIOperation.REMOVE_VIP: {
+		"endpoint": "channels/vips",
+		"scope": "channel:manage:vips",
+		"method": HTTPClient.METHOD_DELETE
 	},
 	APIOperation.GET_SUBS: {
 		"endpoint": "subscriptions",
@@ -151,7 +156,8 @@ const api_operations: Dictionary = {
 	},
 }
 
-var account: String
+# var account: String
+var user_id: String
 var api_operation: APIOperation
 var query_parameters: Dictionary
 var request_body: Dictionary
@@ -166,21 +172,27 @@ var twitch_api: TwitchAPI
 func _ready() -> void:
 	self.use_threads = true
 
-func set_request_data(_twitch_api: TwitchAPI, _account: String, _api_operation: APIOperation, _body: Dictionary = {}, _query_parameters: Dictionary = {}) -> void:
+func set_request_data(_twitch_api: TwitchAPI, _user_id: String, _api_operation: APIOperation, _body: Dictionary = {}, _query_parameters: Dictionary = {}) -> void:
 	twitch_api = _twitch_api
 	api_operation = _api_operation
 	query_parameters = _query_parameters
 	request_body = _body
-	if _account != "":
-		account = _account
-	else:
-		_determine_account()
+	user_id = _user_id
+	# TODO: check if user has scope?
 
 func execute_request() -> void:
-	while twitch_api.token_states[account] == TwitchNode.TokenState.CHECKING:
-		await twitch_api.twitch_node.token_validated
-	if twitch_api.token_states[account] != TwitchNode.TokenState.VALID:
-		twitch_api_request_completed.emit(self, ErrorCode.INVALID_TOKEN)
+	if user_id != "":
+		var user_credentials: Dictionary = twitch_api.credentials.get("tokens",{}).get(user_id, {})
+		if user_credentials.is_empty():
+			printerr("Can't execute %s request: no access token for user id %s" % [APIOperation.keys()[api_operation], user_id])
+			return
+		while user_credentials["state"] == TwitchNode.TokenState.CHECKING \
+				|| user_credentials["state"] == TwitchNode.TokenState.REFRESHING:
+			await twitch_api.twitch_node.token_validated
+		if user_credentials["state"] != TwitchNode.TokenState.VALID:
+			twitch_api_request_completed.emit(self, ErrorCode.INVALID_TOKEN)
+			printerr("Can't execute %s request: invalid access token for user id %s: %s" % [APIOperation.keys()[api_operation], user_id, user_credentials["state"]])
+			return
 
 	var operation_info = api_operations[api_operation]
 
@@ -214,19 +226,11 @@ func execute_request() -> void:
 			response_body = JSON.parse_string(response[3].get_string_from_utf8())
 	twitch_api_request_completed.emit(self, result)
 
-func _determine_account() -> void:
-	var scope: String = api_operations[api_operation]["scope"]
-	if scope.begins_with("channel") \
-			|| scope.begins_with("moderator") \
-			|| scope.begins_with("moderation") \
-			|| (api_operation == APIOperation.SUBSCRIBE_TO_EVENT):
-		account = "channel"
-	else:
-		account = "user"
-
 func _get_request_headers() -> PackedStringArray:
-	return [
-		"Authorization: Bearer %s" % twitch_api.crypto.decrypt(twitch_api.key, twitch_api.encrypted_credentials[account]).get_string_from_utf8(),
+	var headers := [
 		"Client-Id: %s" % twitch_api.get_client_id(),
 		"Content-Type: application/json"
 	]
+	if user_id != "":
+		headers.append("Authorization: Bearer %s" % twitch_api.crypto.decrypt(twitch_api.key, twitch_api.credentials["tokens"][user_id]["access_token"]).get_string_from_utf8())
+	return headers

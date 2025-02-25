@@ -8,3 +8,5 @@ export_presets.cfg
 documentation/*.import
 icon.*
 project.godot
+
+test_functions.gd

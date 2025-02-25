@@ -1,15 +1,21 @@
-[gd_scene load_steps=3 format=3 uid="uid://l6pn8orfewf0"]
+[gd_scene load_steps=4 format=3 uid="uid://l6pn8orfewf0"]
 
 [ext_resource type="Script" path="res://example/twitch_example.gd" id="1_od6ma"]
 [ext_resource type="Script" path="res://addons/twitch_node/twitch_node.gd" id="2_g4gm0"]
+[ext_resource type="Script" path="res://example/settings_bar.gd" id="2_p3c7t"]
 
-[node name="TwitchExample" type="Node" node_paths=PackedStringArray("twitch_node", "scroll_container", "info_container", "poll_label", "hypetrain_label")]
+[node name="TwitchExample" type="Node" node_paths=PackedStringArray("twitch_node", "scroll_container", "info_container", "poll_label", "hypetrain_label", "settings_bar")]
 script = ExtResource("1_od6ma")
 twitch_node = NodePath("TwitchNode")
-scroll_container = NodePath("PanelContainer/VBoxContainer/ScrollContainer")
-info_container = NodePath("PanelContainer/VBoxContainer/ScrollContainer/InfoContainer")
-poll_label = NodePath("PanelContainer/VBoxContainer/PanelContainer/VBoxContainer/PollLabel")
-hypetrain_label = NodePath("PanelContainer/VBoxContainer/PanelContainer/VBoxContainer/HypetrainLabel")
+scroll_container = NodePath("PanelContainer/MarginContainer/VBoxContainer/MessageContainer")
+info_container = NodePath("PanelContainer/MarginContainer/VBoxContainer/MessageContainer/InfoContainer")
+poll_label = NodePath("PanelContainer/MarginContainer/VBoxContainer/InfoContainer/VBoxContainer/PollLabel")
+hypetrain_label = NodePath("PanelContainer/MarginContainer/VBoxContainer/InfoContainer/VBoxContainer/HypetrainLabel")
+settings_bar = NodePath("PanelContainer/MarginContainer/VBoxContainer/SettingsBar")
+
+[node name="TwitchNode" type="Node" parent="."]
+script = ExtResource("2_g4gm0")
+rate_limit = 200
 
 [node name="PanelContainer" type="PanelContainer" parent="."]
 anchors_preset = 15
@@ -20,44 +26,93 @@ grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer"]
+[node name="MarginContainer" type="MarginContainer" parent="PanelContainer"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/MarginContainer"]
 layout_mode = 2
 
-[node name="ScrollContainer" type="ScrollContainer" parent="PanelContainer/VBoxContainer"]
+[node name="SettingsBar" type="HBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer" node_paths=PackedStringArray("account_button", "add_channel_button", "join_container", "channel_input", "twitch_node")]
+layout_mode = 2
+script = ExtResource("2_p3c7t")
+account_button = NodePath("AccountButton")
+add_channel_button = NodePath("AddChannelButton")
+join_container = NodePath("JoinContainer")
+channel_input = NodePath("JoinContainer/ChannelInput")
+twitch_node = NodePath("../../../../TwitchNode")
+
+[node name="Label" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/SettingsBar"]
+layout_mode = 2
+text = "Account"
+
+[node name="AccountButton" type="OptionButton" parent="PanelContainer/MarginContainer/VBoxContainer/SettingsBar"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+
+[node name="AddChannelButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/SettingsBar"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+text = "Add channel"
+
+[node name="JoinContainer" type="HBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer/SettingsBar"]
+layout_mode = 2
+
+[node name="ChannelInput" type="LineEdit" parent="PanelContainer/MarginContainer/VBoxContainer/SettingsBar/JoinContainer"]
+custom_minimum_size = Vector2(200, 0)
+layout_mode = 2
+placeholder_text = "Channel name"
+
+[node name="JoinButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/SettingsBar/JoinContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+text = "Join"
+
+[node name="CancelButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/SettingsBar/JoinContainer"]
+layout_mode = 2
+size_flags_horizontal = 0
+size_flags_vertical = 0
+text = "Cancel"
+
+[node name="AuthButton" type="Button" parent="PanelContainer/MarginContainer/VBoxContainer/SettingsBar"]
+layout_mode = 2
+size_flags_horizontal = 10
+size_flags_vertical = 0
+text = "auth settings"
+
+[node name="MessageContainer" type="ScrollContainer" parent="PanelContainer/MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
 follow_focus = true
 
-[node name="InfoContainer" type="VBoxContainer" parent="PanelContainer/VBoxContainer/ScrollContainer"]
+[node name="InfoContainer" type="VBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer/MessageContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
 
-[node name="PanelContainer" type="PanelContainer" parent="PanelContainer/VBoxContainer"]
+[node name="InfoContainer" type="PanelContainer" parent="PanelContainer/MarginContainer/VBoxContainer"]
 self_modulate = Color(1, 0, 1, 1)
 layout_mode = 2
+size_flags_vertical = 8
 
-[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/VBoxContainer/PanelContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/MarginContainer/VBoxContainer/InfoContainer"]
 layout_mode = 2
 
-[node name="PollLabel" type="Label" parent="PanelContainer/VBoxContainer/PanelContainer/VBoxContainer"]
+[node name="PollLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/InfoContainer/VBoxContainer"]
 layout_mode = 2
+size_flags_vertical = 1
 
-[node name="HypetrainLabel" type="Label" parent="PanelContainer/VBoxContainer/PanelContainer/VBoxContainer"]
+[node name="HypetrainLabel" type="Label" parent="PanelContainer/MarginContainer/VBoxContainer/InfoContainer/VBoxContainer"]
 layout_mode = 2
+size_flags_vertical = 1
 
-[node name="MarginContainer" type="MarginContainer" parent="PanelContainer"]
-layout_mode = 2
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-
-[node name="Button" type="Button" parent="PanelContainer/MarginContainer"]
-layout_mode = 2
-size_flags_horizontal = 8
-size_flags_vertical = 0
-text = "auth settings"
-
-[node name="TwitchNode" type="Node" parent="."]
-script = ExtResource("2_g4gm0")
-
-[connection signal="pressed" from="PanelContainer/MarginContainer/Button" to="." method="on_auth_button_pressed"]
+[connection signal="pressed" from="PanelContainer/MarginContainer/VBoxContainer/SettingsBar/AddChannelButton" to="PanelContainer/MarginContainer/VBoxContainer/SettingsBar" method="on_add_channel_pressed"]
+[connection signal="text_submitted" from="PanelContainer/MarginContainer/VBoxContainer/SettingsBar/JoinContainer/ChannelInput" to="PanelContainer/MarginContainer/VBoxContainer/SettingsBar" method="on_channel_input_submitted"]
+[connection signal="pressed" from="PanelContainer/MarginContainer/VBoxContainer/SettingsBar/JoinContainer/JoinButton" to="PanelContainer/MarginContainer/VBoxContainer/SettingsBar" method="on_join_pressed"]
+[connection signal="pressed" from="PanelContainer/MarginContainer/VBoxContainer/SettingsBar/JoinContainer/CancelButton" to="PanelContainer/MarginContainer/VBoxContainer/SettingsBar" method="on_cancel_pressed"]
+[connection signal="pressed" from="PanelContainer/MarginContainer/VBoxContainer/SettingsBar/AuthButton" to="PanelContainer/MarginContainer/VBoxContainer/SettingsBar" method="on_auth_button_pressed"]

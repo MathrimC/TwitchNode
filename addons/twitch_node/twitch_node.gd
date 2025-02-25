@@ -5,7 +5,8 @@ class_name TwitchNode
 extends Node
 
 enum ErrorCode { UNAUTHORIZED, INVALID_TOKEN, UNAVAILABLE, UNKNOWN_USER, BAD_INPUT }
-enum TokenState { EMPTY, VALID, INVALID, CHECKING, UNKNOWN }
+enum TokenState { EMPTY, VALID, INVALID, CHECKING, REFRESHING, DELETED, UNKNOWN }
+enum AuthType { IMPLICIT, AUTH_CODE }
 
 signal new_chat_message(channel: String, user: String, message: String, event_data: Dictionary)
 signal channel_info_updated(channel: String, title: String, category: String, event_data: Dictionary)
@@ -55,9 +56,10 @@ func _ready() -> void:
 	_twitch_api.twitch_node = self
 	add_child(_twitch_api)
 
-## Connect to channel to trigger signals when events happen in the channel (incoming chat messages, subs, follows, ...) (see list of signals)
-func connect_to_channel(channel: String) -> void:
-	await _twitch_api.connect_to_channel(channel)
+## Connect to channel to trigger signals when events happen in the channel (incoming chat messages, subs, follows, ...) (see list of signals). 
+## Uses the access token of user passed as username.
+func connect_to_channel(channel: String, auth_username: String = "") -> void:
+	await _twitch_api.connect_to_channel(channel, auth_username)
 
 func send_chat_message(channel: String, username: String, message: String) -> void:
 	_twitch_api.send_chat_message(channel, username, message)
@@ -66,17 +68,17 @@ func get_channel_info(channel: String) -> Dictionary:
 	return await _twitch_api.get_channel_info(channel)
 
 ## Delay will not be modified if value -1 is passed. Tags will not be modified if empty array is passed
-func modify_channel_info(channel: String, title: String, category: String = "", language: String = "", delay: int = -1, tags: Array[String] = []):
-	return await _twitch_api.modify_channel_info(channel, title, category, language, delay, tags)
+func modify_channel_info(channel: String, title: String, category: String = "", language: String = "", delay: int = -1, tags: Array[String] = []) -> void:
+	await _twitch_api.modify_channel_info(channel, title, category, language, delay, tags)
 
-func send_shoutout(channel: String, shoutout_channel: String) -> void:
-	_twitch_api.send_shoutout(channel, shoutout_channel)
+func send_shoutout(channel: String, auth_username: String, shoutout_channel: String) -> void:
+	_twitch_api.send_shoutout(channel, auth_username, shoutout_channel)
 
-func warn_user(channel: String, warned_username: String, reason: String) -> void:
-	_twitch_api.warn_user(channel, warned_username, reason)
+func warn_user(channel: String, auth_username: String, warned_username: String, reason: String) -> void:
+	_twitch_api.warn_user(channel, auth_username, warned_username, reason)
 
-func ban_user(channel: String, banned_username: String, duration: int = -1, reason: String = "") -> void:
-	_twitch_api.ban_user(channel, banned_username, duration, reason)
+func ban_user(channel: String, auth_username: String, banned_username: String, duration: int = -1, reason: String = "") -> void:
+	_twitch_api.ban_user(channel, auth_username, banned_username, duration, reason)
 
 func is_vip(channel: String, username: String) -> bool:
 	var response = await _twitch_api.get_vips(channel, "", username)
@@ -102,6 +104,9 @@ func get_next_vips(channel: String) -> Dictionary:
 
 func add_vip(channel: String, vip_username: String) -> void:
 	_twitch_api.add_vip(channel, vip_username)
+
+func remove_vip(channel: String, vip_username: String) -> void:
+	_twitch_api.remove_vip(channel, vip_username)
 
 ## Returns a dictionary with keys "tier", "plan_name", "is_gift", "gifter_name", "gifter_login", "gifter_id", "user_name", "user_login", "user_id", "broadcaster_name", "broadcaster_login", "broadcaster_id".
 ## If the user isn't a sub, an empty dictionary is returned
@@ -129,16 +134,16 @@ func get_next_subs(channel: String) -> Dictionary:
 	return response
 
 ## Returns a dictionary with keys "user_id", "user_name", "user_login" and "followed_at"
-func get_follower_info(channel: String, username: String) -> Dictionary:
-	var response = await _twitch_api.get_followers(channel, "", username)
+func get_follower_info(channel: String, auth_username: String, username: String) -> Dictionary:
+	var response = await _twitch_api.get_followers(channel, auth_username, "", username)
 	if !response.is_empty() && !response["data"].is_empty():
 		return response["data"][0]
 	else:
 		return {}
 
 ## Return the most recent 100 followers of the channel. To retrieve the next 100, call get_next_followers
-func get_followers(channel: String) -> Dictionary:
-	var response = await _twitch_api.get_followers(channel)
+func get_followers(channel: String, auth_username: String) -> Dictionary:
+	var response = await _twitch_api.get_followers(channel, auth_username)
 	if !response["pagination"].is_empty():
 		_followers_page = response["pagination"]["cursor"]
 	else:
@@ -146,23 +151,23 @@ func get_followers(channel: String) -> Dictionary:
 	return response
 
 ## Retrieves the next 100 followers. Returns an empty dictionary if there are no more followers
-func get_next_followers(channel: String) -> Dictionary:
+func get_next_followers(channel: String, auth_username: String) -> Dictionary:
 	if _followers_page == "":
 		return {}
-	var response = await _twitch_api.get_followers(channel, _followers_page)
+	var response = await _twitch_api.get_followers(channel, auth_username, _followers_page)
 	if !response["pagination"].is_empty():
 		_followers_page = response["pagination"]["cursor"]
 	else:
 		_followers_page = ""
 	return response
 
-func is_moderator(channel: String, username: String) -> bool:
-	var response = await _twitch_api.get_moderators(channel, "", username)
+func is_moderator(channel: String, auth_username: String, username: String) -> bool:
+	var response = await _twitch_api.get_moderators(channel, auth_username, "", username)
 	return !response.is_empty() && !response["data"].is_empty()
 
 ## Return the first 100 moderators of the channel. To retrieve the next 100, call get_next_moderators
-func get_moderators(channel: String) -> Dictionary:
-	var response = await _twitch_api.get_moderators(channel)
+func get_moderators(channel: String, auth_username: String) -> Dictionary:
+	var response = await _twitch_api.get_moderators(channel, auth_username)
 	if !response["pagination"].is_empty():
 		_moderators_page = response["pagination"]["cursor"]
 	else:
@@ -170,10 +175,10 @@ func get_moderators(channel: String) -> Dictionary:
 	return response
 
 ## Retrieves the next 100 moderators. Returns an empty dictionary if there are no more moderators
-func get_next_moderators(channel: String) -> Dictionary:
+func get_next_moderators(channel: String, auth_username: String) -> Dictionary:
 	if _moderators_page == "":
 		return {}
-	var response = await _twitch_api.get_moderators(channel, _moderators_page)
+	var response = await _twitch_api.get_moderators(channel, auth_username, _moderators_page)
 	if !response["pagination"].is_empty():
 		_moderators_page = response["pagination"]["cursor"]
 	else:
@@ -214,23 +219,23 @@ func create_custom_reward(channel: String, title: String, cost: int, explanation
 
 ## Only works for custom redemptions created by the same applications. Use the reward id returned by create_custom_reward
 func update_custom_reward(channel: String, reward_id: String, title: String = "", cost: int = 0, explanation: String = "", is_user_input_required: bool = false, is_enabled: bool = true, is_paused: bool = false, max_per_stream: int = 0, max_per_user: int = 0, global_cooldown_s: int = 0, skip_request_queue: bool = false, background_color: Color = Color.WHITE) -> void:
-	_twitch_api.update_custom_reward(channel, reward_id, title, cost, explanation, is_user_input_required, is_enabled, is_paused, max_per_stream, max_per_user, global_cooldown_s, skip_request_queue, background_color)
+	await _twitch_api.update_custom_reward(channel, reward_id, title, cost, explanation, is_user_input_required, is_enabled, is_paused, max_per_stream, max_per_user, global_cooldown_s, skip_request_queue, background_color)
 
 ## Only works for custom redemptions created by the same applications. Use the reward id returned by create_custom_reward
 func enable_custom_reward(channel: String, reward_id: String, is_enabled: bool) -> void:
-	_twitch_api.enable_custom_reward(channel, reward_id, is_enabled)
+	await _twitch_api.enable_custom_reward(channel, reward_id, is_enabled)
 
 ## Only works for custom redemptions created by the same applications. Use the reward id returned by create_custom_reward
 func pause_custom_reward(channel: String, reward_id: String, is_paused: bool) -> void:
-	_twitch_api.pause_custom_reward(channel, reward_id, is_paused)
+	await _twitch_api.pause_custom_reward(channel, reward_id, is_paused)
 
 ## Only works for custom redemptions created by the same application
 func cancel_channel_redemption(channel: String, reward_id: String, redemption_id: String) -> void:
-	_twitch_api.update_redemption_status(channel, reward_id, redemption_id, "CANCELED")
+	await _twitch_api.update_redemption_status(channel, reward_id, redemption_id, "CANCELED")
 
 ## Only works for custom redemptions created by the same application
 func fulfill_channel_redemption(channel: String, reward_id: String, redemption_id: String) -> void:
-	_twitch_api.update_redemption_status(channel, reward_id, redemption_id, "FULFILLED")
+	await _twitch_api.update_redemption_status(channel, reward_id, redemption_id, "FULFILLED")
 
 ## Color needs to be blue, green, orange or purple
 func send_chat_announcement(channel: String, username: String, message: String, color: String) -> void:
@@ -256,36 +261,39 @@ func snooze_next_ad(channel: String) -> Dictionary:
 func get_streams(broadcasters: Array[String], game_ids: Array[String] = [], live_only: bool = false, languages: Array[String] = ["en"]) -> Array:
 	return await _twitch_api.get_streams(broadcasters, game_ids, live_only, languages)
 
-func get_channel_auth_url( _redirect_url: String) -> String:
-	return _twitch_api.get_channel_auth_url(_redirect_url)
-
-func get_useraccount_auth_url( _redirect_url: String) -> String:
-	return _twitch_api.get_useraccount_auth_url(_redirect_url)
+func get_auth_url(_scopes: Array[String], _auth_type: AuthType, _redirect_url: String, _state: String = ""):
+	return _twitch_api.get_auth_url(_scopes, _auth_type, _redirect_url, _state)
 
 ## Client_id: application client id (from Twitch Dev Console) [br]
-## Channel token: access token generated when authorizing the application with your Twitch channel account [br]
-## User token: access token generated when authorizing the application with a bot account that has moderator privileges on the channel [br]
+## Client_secret: application secret (from Twitch Dev Console) [br]
 ## Store: whether or not the credentials should be stored in an encrypted file in the project user directory. If yes, they will be retreived automatically next time the program runs
-func set_credentials(client_id: String, channel_token: String, user_token: String, store: bool) -> void:
-	_twitch_api.set_credentials(client_id, channel_token, user_token, store)
+func set_credentials(client_id: String, client_secret: String, store: bool) -> void:
+	_twitch_api.set_credentials(client_id, client_secret, store)
+
+func add_token(token: String, auth_type: AuthType, scopes: Array[String], redirect_uri: String) -> String:
+	return await _twitch_api.add_token(token, auth_type, scopes, redirect_uri)
+
+func delete_token(account: String) -> void:
+	_twitch_api.delete_token(account)
 
 ## Account: "channel" or "user"
 func get_token_state(account: String) -> TokenState:
-	return _twitch_api.token_states[account]
-
-func has_valid_credentials() -> bool:
-	while get_token_state("channel") == TokenState.CHECKING || get_token_state("user") == TokenState.CHECKING:
-		await token_validated
-	return get_token_state("channel") == TokenState.VALID && get_token_state("user") == TokenState.VALID
+	return await _twitch_api.get_token_state(account)
 
 func get_client_id() -> String:
 	return _twitch_api.get_client_id()
 
-func get_channel_authorization_url() -> String:
-	return _twitch_api.get_channel_authorization_url()
+func get_token_accounts() -> Array[String]:
+	return await _twitch_api.get_token_accounts()
 
-func get_useraccount_authorization_url() -> String:
-	return _twitch_api.get_useraccount_authorization_url()
+func has_client_secret() -> bool:
+	return _twitch_api.has_client_secret()
+
+func get_token_scopes(account: String) -> Array[String]:
+	return await _twitch_api.get_token_scopes(account)
+
+func get_scopes() -> Array[String]:
+	return _twitch_api.get_scopes()
 
 func _process_twitch_event(event_type: TwitchAPI.EventType, event_data: Dictionary):
 	match event_type:

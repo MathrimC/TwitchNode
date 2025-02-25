@@ -14,7 +14,7 @@ var token = GetURLParameter("access_token")
 fetch("http://localhost:7345", {
 	method: "POST",
 	body: JSON.stringify({
-		token: token
+		token: token,
 	}),
 	headers: {
 		"Content-type": "application/json; charset=UTF-8"
@@ -39,5 +39,6 @@ function GetURLParameter(sParam)
 			return sParameterName[1];
 		}
 	}
+	return ""
 }
 </script>

@@ -9,6 +9,7 @@ enum EventType { CHANNEL_CHAT_MESSAGE, CHANNEL_UPDATE, CHANNEL_FOLLOW, CHANNEL_S
 const base_uri := "https://api.twitch.tv/helix/"
 const websocket_uri: String = "wss://eventsub.wss.twitch.tv/ws"
 const auth_uri = "https://id.twitch.tv/oauth2/authorize"
+const token_uri = "https://id.twitch.tv/oauth2/token"
 const validate_uri = "https://id.twitch.tv/oauth2/validate"
 const test_base_uri := "http://127.0.0.1:8080/"
 const test_websocket_uri := "ws://127.0.0.1:8080/ws"
@@ -186,7 +187,7 @@ var rate_limit_remaining: int
 ## Key: username, value: user id
 var user_list: Dictionary
 var invalid_users: Array
-var channels: Array[String]
+var connections: Array[Dictionary]
 var poll_id: String
 var prediction_info: Dictionary
 ## Requests queued due to rate limit
@@ -194,11 +195,13 @@ var request_queue: Array[TwitchAPIRequest]
 var request_pool: Array[TwitchAPIRequest]
 var session_id: String = ""
 var socket := WebSocketPeer.new()
-var encrypted_credentials: Dictionary
-## key: "channel" or "user", value: TwitchNode.TokenState
-var token_states: Dictionary
-var key: CryptoKey
 
+var credentials: Dictionary
+var store_credentials: bool
+
+var token_refresh_running: Dictionary
+
+var key: CryptoKey
 var crypto: Crypto
 
 func _enter_tree():
@@ -206,37 +209,55 @@ func _enter_tree():
 	rate_limit_remaining = twitch_node.rate_limit
 	crypto = Crypto.new()
 	_init_credentials()
+	for user_id in credentials.get("tokens", []):
+		var user_credentials = credentials["tokens"][user_id]
+		user_credentials["state"] = TwitchNode.TokenState.CHECKING
+		if user_credentials.get("auth_type", 0) == TwitchNode.AuthType.AUTH_CODE:
+			_refresh_token_cycle(user_id)
 
 func _ready() -> void:
 	_validation_loop()
 	_rate_limit_loop()
 	_request_cleanup_loop()
 
-func connect_to_channel(channel: String) -> void:
-	while token_states["channel"] == TwitchNode.TokenState.CHECKING:
+func connect_to_channel(channel: String, username: String = "") -> void:
+	var usernames: Array[String] = [channel, username]
+	if !await _check_user_ids(usernames):
+		printerr("Can't connect to channel due to missing channel id")
+		return
+	var channel_id = user_list[channel]
+	var user_id = user_list[username]
+	var token_info: Dictionary = credentials.get("tokens", {}).get(user_id, {})
+	if token_info.is_empty():
+		printerr("Can't connect to channel due to missing token for user %s" % username)
+		return
+	var token_state: TwitchNode.TokenState = token_info.get("state", TwitchNode.TokenState.EMPTY)
+	while token_state == TwitchNode.TokenState.CHECKING \
+			|| token_state == TwitchNode.TokenState.REFRESHING:
 		await twitch_node.token_validated
-	while token_states["user"] == TwitchNode.TokenState.CHECKING:
-		await twitch_node.token_validated
-	if token_states["channel"] != TwitchNode.TokenState.VALID:
-		printerr("Can't connect to channel due to invalid channel access token")
+		token_state = token_info.get("state", TwitchNode.TokenState.EMPTY)
+	if token_state != TwitchNode.TokenState.VALID:
+		printerr("Can't connect to channel due to invalid token for user %s" % username)
 		return
 	if session_id == "":
 		_connect_twitch_websocket()
 		await websocket_connected
-	if await _check_user_ids([channel]):
-		var channel_id = user_list[channel]
-		channels.append(channel_id)
-		for type in EventType.size():
-			_execute_request(TwitchAPIRequest.APIOperation.SUBSCRIBE_TO_EVENT, "channel", _get_event_sub_body(type, channel_id), {})
-	else:
-		printerr("Can't connect to channel due to missing channel id")
+	var scopes := _get_token_scopes(user_id)
+	for event in events:
+		var event_info: Dictionary = events[event]
+		var scope: String = event_info["scope"]
+		if scope == "" || scopes.has(scope):
+			if (scope.begins_with("channel") || scope.begins_with("bits")) && channel_id != user_id:
+				continue
+			_execute_request(TwitchAPIRequest.APIOperation.SUBSCRIBE_TO_EVENT, user_id, _get_event_sub_body(event, channel_id, user_id), {})
+	connections.append({"channel_id": channel_id, "user_id": user_id})
 
 func send_chat_message(channel: String, username: String, message: String) -> void:
 	if await _check_user_ids([channel, username]):
 		var channel_id = user_list.get(channel, "")
 		var user_id = user_list.get(username, "")
 		var body :=	{ "broadcaster_id": channel_id, "sender_id": user_id, "message" : message }
-		_execute_request(TwitchAPIRequest.APIOperation.POST_CHAT_MESSAGE, "user", body)
+		_execute_request(TwitchAPIRequest.APIOperation.POST_CHAT_MESSAGE, user_id, body)
 	else:
 		printerr("Can't send chat message as %s due to missing user ids" % username)
 
@@ -280,7 +301,7 @@ func modify_channel_info(channel: String, title: String, category: String = "", 
 			body["delay"] = delay
 		if !tags.is_empty():
 			body["tags"] = tags
-		_execute_request(TwitchAPIRequest.APIOperation.MODIFY_CHANNEL_INFO, "", body, query_parameters)
+		await _execute_request(TwitchAPIRequest.APIOperation.MODIFY_CHANNEL_INFO, channel_id, body, query_parameters)
 	else:
 		printerr("Can't update channel info due to missing channel id")
 	
@@ -304,20 +325,20 @@ func get_streams(broadcasters: Array[String], game_ids: Array[String] = [], live
 			printerr("Error getting streams from Twitch")
 			return []
 	else:
-		printerr("Can't get streams due to invalide broadcaster name")
+		printerr("Can't get streams due to invalid broadcaster name")
 		return []
 
-func send_shoutout(channel: String, shoutout_channel: String) -> void:
-	if await _check_user_ids([channel, shoutout_channel]):
+func send_shoutout(channel: String, auth_username: String, shoutout_channel: String) -> void:
+	if await _check_user_ids([channel, auth_username, shoutout_channel]):
 		var channel_id = user_list.get(channel, "")
-		# var user_id = user_list.get(username, "")
+		var user_id = user_list.get(auth_username, "")
 		var shoutout_channel_id = user_list.get(shoutout_channel, "")
 		var body := {
 			"from_broadcaster_id": channel_id,
 			"to_broadcaster_id": shoutout_channel_id,
 			"moderator_id": channel_id,
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.SEND_SHOUTOUT, "", body)
+		_execute_request(TwitchAPIRequest.APIOperation.SEND_SHOUTOUT, user_id, body)
 	else:
 		printerr("Can't send shoutout to %s due to missing user ids" % shoutout_channel)
 
@@ -346,7 +367,7 @@ func create_custom_reward(channel: String, title: String, cost: int, explanation
 		if global_cooldown_s > 0:
 			body["is_global_cooldown_enabled"] = true
 			body["global_cooldown_seconds"] = global_cooldown_s
-		var result := await _execute_request(TwitchAPIRequest.APIOperation.CREATE_CUSTOM_REWARD, "", body, query_parameters)
+		var result := await _execute_request(TwitchAPIRequest.APIOperation.CREATE_CUSTOM_REWARD, channel_id, body, query_parameters)
 		if !result.response_body.is_empty():
 			return result.response_body["data"][0]["id"]
 		elif result.response_code == 400:
@@ -366,7 +387,7 @@ func get_custom_rewards(channel: String, ids: Array[String] = [], only_manageabl
 			"id": ids,
 			"only_manageable": only_manageable
 		}
-		var result := await _execute_request(TwitchAPIRequest.APIOperation.GET_CUSTOM_REWARDS, "", {}, query_parameters)
+		var result := await _execute_request(TwitchAPIRequest.APIOperation.GET_CUSTOM_REWARDS, channel_id, {}, query_parameters)
 		if !result.response_body.is_empty():
 			return result.response_body["data"]
 		else:
@@ -416,7 +437,7 @@ func update_custom_reward(channel: String, reward_id: String, title: String = ""
 			body["is_paused"] = is_paused
 		if reward_info["should_redemptions_skip_request_queue"] != skip_request_queue:
 			body["should_redemptions_skip_request_queue"] = skip_request_queue
-		_execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, "", body, query_parameters)
+		await _execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, channel_id, body, query_parameters)
 	elif rewards.is_empty():
 		printerr("Reward update failed: can't find reward with id %s" % reward_id)
 	else:
@@ -432,7 +453,7 @@ func enable_custom_reward(channel: String, reward_id: String, is_enabled = false
 		var body := {
 			"is_enabled": is_enabled,
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, "", body, query_parameters)
+		await _execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, channel_id, body, query_parameters)
 	else:
 		printerr("Can't create reward due to missing channel id")
 
@@ -446,7 +467,7 @@ func pause_custom_reward(channel: String, reward_id: String, is_paused = false) 
 		var body := {
 			"is_paused": is_paused,
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, "", body, query_parameters)
+		await _execute_request(TwitchAPIRequest.APIOperation.UPDATE_CUSTOM_REWARD, channel_id, body, query_parameters)
 	else:
 		printerr("Can't create reward due to missing channel id")
 
@@ -461,14 +482,14 @@ func update_redemption_status(channel: String, reward_id: String, redemption_id:
 		var body := {
 			"status" = status
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.UPDATE_REDEMPTION_STATUS, "", body, query_parameters)
+		await _execute_request(TwitchAPIRequest.APIOperation.UPDATE_REDEMPTION_STATUS, channel_id, body, query_parameters)
 	else:
 		printerr("Can't update redemption status due to missing channel id")
 	
-func warn_user(channel: String, warned_username: String, reason: String) -> void:
-	if await _check_user_ids([channel, warned_username]):
+func warn_user(channel: String, username: String, warned_username: String, reason: String) -> void:
+	if await _check_user_ids([channel, username, warned_username]):
 		var channel_id = user_list.get(channel, "")
-		# var user_id = user_list.get(bot_username, "")
+		var user_id = user_list.get(username, "")
 		var warned_user_id = user_list.get(warned_username, "")
 		var query_parameters := {
 			"broadcaster_id" = channel_id,
@@ -477,11 +498,11 @@ func warn_user(channel: String, warned_username: String, reason: String) -> void
 		var body := {
 			"data" = {"user_id": warned_user_id, "reason": reason}
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.WARN_USER, "channel", body, query_parameters)
+		_execute_request(TwitchAPIRequest.APIOperation.WARN_USER, user_id, body, query_parameters)
 	else:
 		printerr("Can't warn user %s due to missing user ids" % warned_username)
 
-func ban_user(channel: String, banned_username: String, duration: int = -1, reason: String = "") -> void:
+func ban_user(channel: String, username: String, banned_username: String, duration: int = -1, reason: String = "") -> void:
 	if await _check_user_ids([channel, banned_username]):
 		var channel_id = user_list.get(channel, "")
 		# var user_id = user_list.get(bot_username, "")
@@ -497,7 +518,7 @@ func ban_user(channel: String, banned_username: String, duration: int = -1, reas
 			"broadcast_id" : channel_id,
 			"moderator_id" : channel_id,
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.BAN_USER, "channel", body, query_parameters)
+		_execute_request(TwitchAPIRequest.APIOperation.BAN_USER, username, body, query_parameters)
 	else:
 		printerr("Can't ban user %s due to missing user ids" % banned_username)
 
@@ -519,13 +540,13 @@ func get_vips(channel: String, page: String = "", user: String = "") -> Dictiona
 			query_parameters["page"] = page
 		if user_id != "":
 			query_parameters["user_id"] = user_id
-		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_VIPS, "", {}, query_parameters)
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_VIPS, channel_id, {}, query_parameters)
 		return request.response_body
 	else:
 		printerr("Can't get vips due to missing channel id")
 		return {}
 
-func add_vip(channel: String, vip_username = "", page: String = "") -> void:
+func add_vip(channel: String, vip_username: String) -> void:
 	if await _check_user_ids([channel, vip_username]):
 		var channel_id = user_list[channel]
 		var vip_user_id = user_list[vip_username]
@@ -533,9 +554,19 @@ func add_vip(channel: String, vip_username = "", page: String = "") -> void:
 			"user_id" : vip_user_id,
 			"broadcaster_id" : channel_id,
 		}
-		if page != "":
-			query_parameters["after"] = page
-		_execute_request(TwitchAPIRequest.APIOperation.ADD_VIP, "", {}, query_parameters)
+		_execute_request(TwitchAPIRequest.APIOperation.ADD_VIP, channel_id, {}, query_parameters)
+	else:
+		printerr("Can't add %s as vip due to missing user ids" % vip_username)
+
+func remove_vip(channel: String, vip_username: String) -> void:
+	if await _check_user_ids([channel, vip_username]):
+		var channel_id = user_list[channel]
+		var vip_user_id = user_list[vip_username]
+		var query_parameters := {
+			"user_id" : vip_user_id,
+			"broadcaster_id" : channel_id,
+		}
+		_execute_request(TwitchAPIRequest.APIOperation.REMOVE_VIP, channel_id, {}, query_parameters)
 	else:
 		printerr("Can't add %s as vip due to missing user ids" % vip_username)
 
@@ -557,13 +588,13 @@ func get_subs(channel: String, page: String = "", user: String = "") -> Dictiona
 			query_parameters["after"] = page
 		if user_id != "":
 			query_parameters["user_id"] = user_id
-		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_SUBS, "", {}, query_parameters)
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_SUBS, channel_id, {}, query_parameters)
 		return request.response_body
 	else:
 		printerr("Can't get subs due to missing channel id")
 		return {}
 
-func get_followers(channel: String, page: String = "", user: String = "") -> Dictionary:
+func get_followers(channel: String, auth_username: String, page: String = "", user: String = "") -> Dictionary:
 	var user_id := ""
 	if user != "":
 		if await _check_user_ids([user]):
@@ -571,8 +602,9 @@ func get_followers(channel: String, page: String = "", user: String = "") -> Dic
 		else:
 			printerr("Can't get follow info for unknown user %s" % user)
 			return {}
-	if await _check_user_ids([channel]):
+	if await _check_user_ids([channel, auth_username]):
 		var channel_id = user_list[channel]
+		var auth_user_id = user_list[auth_username]
 		var query_parameters := {
 			"broadcaster_id" : channel_id,
 			"first" : 100,
@@ -581,13 +613,13 @@ func get_followers(channel: String, page: String = "", user: String = "") -> Dic
 			query_parameters["after"] = page
 		if user_id != "":
 			query_parameters["user_id"] = user_id
-		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_FOLLOWERS, "", {}, query_parameters)
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_FOLLOWERS, auth_user_id, {}, query_parameters)
 		return request.response_body
 	else:
-		printerr("Can't get followers due to missing channel id")
+		printerr("Can't get followers due to missing channel id or auth user id")
 		return {}
 
-func get_moderators(channel: String, page: String = "", user: String = "") -> Dictionary:
+func get_moderators(channel: String, auth_username: String, page: String = "", user: String = "") -> Dictionary:
 	var user_id := ""
 	if user != "":
 		if await _check_user_ids([user]):
@@ -595,8 +627,9 @@ func get_moderators(channel: String, page: String = "", user: String = "") -> Di
 		else:
 			printerr("Can't get moderator info for unknown user %s" % user)
 			return {}
-	if await _check_user_ids([channel]):
+	if await _check_user_ids([channel, auth_username]):
 		var channel_id = user_list[channel]
+		var auth_user_id = user_list[auth_username]
 		var query_parameters := {
 			"broadcaster_id" : channel_id,
 			"first" : 100,
@@ -605,10 +638,10 @@ func get_moderators(channel: String, page: String = "", user: String = "") -> Di
 			query_parameters["after"] = page
 		if user_id != "":
 			query_parameters["user_id"] = user_id
-		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_MODERATORS, "", {}, query_parameters)
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_MODERATORS, auth_user_id, {}, query_parameters)
 		return request.response_body
 	else:
-		printerr("Can't get moderators due to missing channel id")
+		printerr("Can't get moderators due to missing channel id or auth user id")
 		return {}
 
 func create_poll(channel: String, poll_title: String, poll_choices: Array[String], poll_duration: int) -> void:
@@ -622,7 +655,7 @@ func create_poll(channel: String, poll_title: String, poll_choices: Array[String
 		}
 		for choice: String in poll_choices:
 			body["choices"].append({ "title" : choice.left(25)})
-		_execute_request(TwitchAPIRequest.APIOperation.CREATE_POLL, "", body)
+		_execute_request(TwitchAPIRequest.APIOperation.CREATE_POLL, channel_id, body)
 	else:
 		printerr("Can't create poll due to missing channel id")
 
@@ -640,7 +673,7 @@ func create_prediction(channel: String, prediction_title: String, prediction_out
 		}
 		for outcome in prediction_outcomes:
 			body["outcomes"].append({"title": outcome.left(25)})
-		var request := await _execute_request(TwitchAPIRequest.APIOperation.CREATE_PREDICTION, "", body)
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.CREATE_PREDICTION, channel_id, body)
 		if request.response_code == 200:
 			prediction_info = request.response_body["data"][0]
 		else:
@@ -656,7 +689,7 @@ func lock_prediction(channel: String) -> void:
 			"id" : prediction_info["id"],
 			"status" : "LOCKED"
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.END_PREDICTION, "", body)
+		_execute_request(TwitchAPIRequest.APIOperation.END_PREDICTION, channel_id, body)
 	else:
 		printerr("Can't lock prediction due to missing channel id")
 
@@ -674,7 +707,7 @@ func resolve_prediction(channel: String, outcome: String) -> void:
 			"status" : "RESOLVED",
 			"winning_outcome_id" : outcome_id
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.END_PREDICTION, "", body)
+		_execute_request(TwitchAPIRequest.APIOperation.END_PREDICTION, channel_id, body)
 	elif outcome_id == "":
 		printerr("Couldn't find prediction outcome %s in prediction options" % outcome)
 		twitch_node.error_occured.emit(TwitchNode.ErrorCode.BAD_INPUT, {"message": "Prediction outcome not found"})
@@ -689,14 +722,14 @@ func cancel_prediction(channel: String) -> void:
 			"id" : prediction_info["id"],
 			"status" : "CANCELED"
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.END_PREDICTION, "", body)
+		_execute_request(TwitchAPIRequest.APIOperation.END_PREDICTION, channel_id, body)
 	else:
 		printerr("Can't cancel prediction due to missing channel id")
 
-func send_chat_announcement(channel: String, user: String, message: String, color: String = "") -> void:
-	if await _check_user_ids([channel, user]):
+func send_chat_announcement(channel: String, auth_username: String, message: String, color: String = "") -> void:
+	if await _check_user_ids([channel, auth_username]):
 		var channel_id = user_list[channel]
-		var user_id = user_list[user]
+		var user_id = user_list[auth_username]
 		var query_parameters := {
 			"broadcaster_id" : channel_id,
 			"moderator_id" : user_id,
@@ -706,7 +739,7 @@ func send_chat_announcement(channel: String, user: String, message: String, colo
 		}
 		if color == "blue" || color == "green" || color == "orange" || color == "purple":
 			body["color"] = color
-		_execute_request(TwitchAPIRequest.APIOperation.SEND_CHAT_ANNOUNCEMENT, "user", body, query_parameters)
+		_execute_request(TwitchAPIRequest.APIOperation.SEND_CHAT_ANNOUNCEMENT, user_id, body, query_parameters)
 	else:
 		printerr("Can't cancel prediction due to missing channel id")
 
@@ -718,7 +751,7 @@ func start_raid(channel: String, raid_target: String) -> void:
 			"from_broadcaster_id" : channel_id,
 			"to_broadcaster_id" : target_id,
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.START_RAID, "", {}, query_parameters)
+		_execute_request(TwitchAPIRequest.APIOperation.START_RAID, channel_id, {}, query_parameters)
 	else:
 		printerr("Can't start raid due to missing channel id")
 
@@ -728,7 +761,7 @@ func cancel_raid(channel: String) -> void:
 		var query_parameters := {
 			"broadcaster_id" : channel_id,
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.CANCEL_RAID, "", {}, query_parameters)
+		_execute_request(TwitchAPIRequest.APIOperation.CANCEL_RAID, channel_id, {}, query_parameters)
 	else:
 		printerr("Can't start raid due to missing channel id")
 
@@ -739,7 +772,7 @@ func start_commercial(channel: String, length: int) -> void:
 			"broadcaster_id" : channel_id,
 			"length" : length
 		}
-		_execute_request(TwitchAPIRequest.APIOperation.START_COMMERCIAL, "", {}, query_parameters)
+		_execute_request(TwitchAPIRequest.APIOperation.START_COMMERCIAL, channel_id, {}, query_parameters)
 	else:
 		printerr("Can't start ads due to missing channel id")
 
@@ -749,7 +782,7 @@ func get_ad_schedule(channel: String) -> Dictionary:
 		var query_parameters := {
 			"broadcaster_id" : channel_id,
 		}
-		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_AD_SCHEDULE, "", {}, query_parameters)
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_AD_SCHEDULE, channel_id, {}, query_parameters)
 		if !request.response_body.is_empty():
 			return request.response_body["data"][0]
 		else:
@@ -764,7 +797,7 @@ func snooze_next_ad(channel: String) -> Dictionary:
 		var query_parameters := {
 			"broadcaster_id" : channel_id,
 		}
-		var request := await _execute_request(TwitchAPIRequest.APIOperation.SNOOZE_NEXT_AD, "", {}, query_parameters)
+		var request := await _execute_request(TwitchAPIRequest.APIOperation.SNOOZE_NEXT_AD, channel_id, {}, query_parameters)
 		if !request.response_body.is_empty():
 			return request.response_body["data"][0]
 		else:
@@ -773,63 +806,60 @@ func snooze_next_ad(channel: String) -> Dictionary:
 		printerr("Can't snooze ads due to missing channel id")
 		return {}
 
-static func get_channel_scope() -> String:
-	var scopes: Array[String]
-	for operation  in TwitchAPIRequest.api_operations.values():
-		var scope: String = operation["scope"]
-		if (scope.begins_with("channel") \
-				|| scope.begins_with("moderator") \
-				|| scope.begins_with("moderation")) \
-				&& !scopes.has(scope):
-			scopes.append(scope)
-	for event: Dictionary in events.values():
-		var scope: String = event["scope"]
-		# if scope.begins_with("channel") && !scopes.has(scope):
-		if scope != "" && !scopes.has(scope):
-			scopes.append(scope)
-	var scope_str: String = ""
-	for scope in scopes:
-		scope_str += scope + " "
-	scope_str = scope_str.trim_suffix(" ")
-	return scope_str
-
-static func get_useraccount_scope() -> String:
-	var scopes: Array[String]
-	for operation  in TwitchAPIRequest.api_operations.values():
-		var scope: String = operation["scope"]
-		if (scope.begins_with("user") || scope.begins_with("moderator")) && !scopes.has(scope):
-		# if scope.begins_with("user") && !scopes.has(scope):
-			scopes.append(scope)
-	var scope_str: String = ""
-	for scope in scopes:
-		scope_str += scope + " "
-	scope_str = scope_str.trim_suffix(" ")
-	return scope_str
-
-func get_channel_auth_url(_redirect_uri: String) -> String:
-	# var decrypted := crypto.decrypt(key, file.get_buffer(file.get_length()))
+func get_auth_url(_scopes: Array[String], _auth_type: TwitchNode.AuthType, _redirect_uri: String, _state: String = "") -> String:
+	var scopes_str: String
+	for scope in _scopes:
+		scopes_str += scope + " "
+	scopes_str = scopes_str.trim_suffix(" ")
 	var query_parameters := {
-		"response_type" : "token",
+		"response_type" : "token" if _auth_type == TwitchNode.AuthType.IMPLICIT else "code",
 		"client_id" : get_client_id(),
 		"redirect_uri" : _redirect_uri,
-		"scope" : get_channel_scope(),
+		"scope" : scopes_str,
+		"force_verify" : true,
 	}
-	return auth_uri + "?" + HTTPClient.new().query_string_from_dict(query_parameters)
-
-func get_useraccount_auth_url(_redirect_uri: String) -> String:
-	# var decrypted := crypto.decrypt(key, file.get_buffer(file.get_length()))
-	var query_parameters := {
-		"response_type" : "token",
-		"client_id" : get_client_id(),
-		"redirect_uri" : _redirect_uri,
-		"scope" : get_useraccount_scope()
-	}
+	if _state != "":
+		query_parameters["state"] = _state
 	return auth_uri + "?" + HTTPClient.new().query_string_from_dict(query_parameters)
 
 func get_client_id() -> String:
-	return crypto.decrypt(key, encrypted_credentials["client_id"]).get_string_from_utf8()
+	return crypto.decrypt(key, credentials["client_id"]).get_string_from_utf8()
 
-func _get_event_sub_body(event_type: EventType, channel_id: String) -> Dictionary:
+func has_client_secret() -> bool:
+	return !credentials.get("client_secret",[]).is_empty()
+
+func get_token_state(username: String) -> TwitchNode.TokenState:
+	if !await _check_user_ids([username]):
+		printerr("Error getting token state for unkown user %s" % username)
+		return TwitchNode.TokenState.EMPTY
+	var user_id = user_list[username]
+	return credentials.get("tokens", {}).get(user_id, {}).get("state", TwitchNode.TokenState.EMPTY)
+
+func get_token_scopes(username: String) -> Array[String]:
+	var scopes: Array[String] = []
+	if !await _check_user_ids([username]):
+		printerr("Error fetching token scopes: account %s not found" % username)
+	return _get_token_scopes(user_list[username])
+
+func _get_token_scopes(user_id: String) -> Array[String]:
+	var scopes: Array[String] = []
+	scopes.assign(credentials.get("tokens",{}).get(user_id, {}).get("scopes", []))
+	return scopes
+
+func get_scopes() -> Array[String]:
+	var scopes: Array[String]
+	for operation in TwitchAPIRequest.api_operations.values():
+		var scope: String = operation["scope"]
+		if scope != "" && !scopes.has(scope):
+			scopes.append(scope)
+	for event: Dictionary in events.values():
+		var scope: String = event["scope"]
+		if scope != "" && !scopes.has(scope):
+			scopes.append(scope)
+	scopes.sort()
+	return scopes
+
+func _get_event_sub_body(event_type: EventType, channel_id: String, user_id: String) -> Dictionary:
 	var body := { "type": "", "version": "1", "condition": { "broadcaster_user_id": channel_id}, "transport" : {"method": "websocket", "session_id": session_id}}
 	var event_info: Dictionary = events[event_type]
 	body["type"] = event_info["type"]
@@ -839,9 +869,9 @@ func _get_event_sub_body(event_type: EventType, channel_id: String) -> Dictionar
 			"broadcaster_id":
 				body["condition"]["broadcaster_id"] = channel_id
 			"user_id":
-				body["condition"]["user_id"] = channel_id
+				body["condition"]["user_id"] = user_id
 			"moderator_user_id":
-				body["condition"]["moderator_user_id"] = channel_id
+				body["condition"]["moderator_user_id"] = user_id
 			"from_broadcaster_user_id":
 				body["condition"]["from_broadcaster_user_id"] = channel_id
 			"to_broadcaster_user_id":
@@ -873,6 +903,21 @@ func _check_user_ids(usernames: Array[String]) -> bool:
 				return false
 	return true
 
+func _get_user_info(user_id: String) -> Dictionary:
+	var query_parameters: Dictionary = { "id": user_id }
+	var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_USER_INFO, "", {}, query_parameters)
+	if request.response_code == 200:
+		var user_info: Dictionary = request.response_body.get("data",[{}])[0]
+		var login: String = user_info.get("login", "")
+		if login != "":
+			user_list[login] = user_id
+		var display_name: String = user_info.get("display_name")
+		if display_name != "":
+			user_list[display_name] = user_id
+		return user_info
+	else:
+		return {}
+
 func _get_category_id(category: String) -> String:
 	var query_parameters := {
 		"name" = category
@@ -883,10 +928,15 @@ func _get_category_id(category: String) -> String:
 	printerr("Category not found: %s" % category)
 	return ""
 
-func _execute_request(api_operation: TwitchAPIRequest.APIOperation, account: String, body: Dictionary = {}, query_parameters: Dictionary = {}) -> TwitchAPIRequest:
+func _execute_request(api_operation: TwitchAPIRequest.APIOperation, user_id: String, body: Dictionary = {}, query_parameters: Dictionary = {}) -> TwitchAPIRequest:
 	var request := TwitchAPIRequest.new()
 	add_child(request)
-	request.set_request_data(self, account, api_operation, body, query_parameters)
+	if user_id == "":
+		var tokens: Dictionary = credentials.get("tokens", {})
+		if tokens.is_empty():
+			printerr("Error executing request operation %s: no tokens available" % api_operation)
+		user_id = tokens.keys()[0]
+	request.set_request_data(self, user_id, api_operation, body, query_parameters)
 	if rate_limit_remaining > 0:
 		rate_limit_remaining -= 1
 		request.execute_request()
@@ -917,6 +967,8 @@ func _request_cleanup_loop() -> void:
 		await get_tree().create_timer(1).timeout
 
 func _connect_twitch_websocket() -> void:
+	if socket.get_ready_state() != WebSocketPeer.State.STATE_CLOSED:
+		return
 	var ws_url := websocket_uri
 	if test:
 		ws_url = test_websocket_uri
@@ -952,13 +1004,35 @@ func _socket_poll_loop() -> void:
 				_connect_twitch_websocket()
 				await websocket_connected
 				_reconnect_to_channels()
-		await get_tree().create_timer(0.1).timeout
+		await get_tree().create_timer(0.01).timeout
 
 func _reconnect_to_channels() -> void:
-	for channel_id in channels:
-		for type in EventType.size():
-			_execute_request(TwitchAPIRequest.APIOperation.SUBSCRIBE_TO_EVENT, "channel", _get_event_sub_body(type, channel_id), {})
-
+	for connection in connections:
+		var channel_id = connection["channel_id"]
+		var user_id = connection["user_id"]
+		var token_info: Dictionary = credentials.get("tokens", {}).get(user_id, {})
+		if token_info.is_empty():
+			printerr("Can't connect to channel due to missing token for userid %s" % user_id)
+			continue
+		var token_state: TwitchNode.TokenState = token_info["state"]
+		while token_state == TwitchNode.TokenState.CHECKING \
+				|| token_state == TwitchNode.TokenState.REFRESHING:
+			await twitch_node.token_validated
+			token_state = token_info["state"]
+		if token_state != TwitchNode.TokenState.VALID:
+			printerr("Can't connect to channel due to invalid token for userid %s" % user_id)
+			continue
+		if session_id == "":
+			_connect_twitch_websocket()
+			await websocket_connected
+		var scopes := _get_token_scopes(user_id)
+		for event in events:
+			var event_info: Dictionary = events[event]
+			var scope: String = event_info["scope"]
+			if scopes.has(scope):
+				if (scope.begins_with("channel") || scope.begins_with("bits")) && channel_id != user_id:
+					continue
+				_execute_request(TwitchAPIRequest.APIOperation.SUBSCRIBE_TO_EVENT, user_id, _get_event_sub_body(event, channel_id, user_id), {})
 
 func _process_message(message_data: Dictionary) -> void:
 	match message_data["metadata"]["message_type"]:
@@ -971,12 +1045,12 @@ func _process_message(message_data: Dictionary) -> void:
 			if event_type_str.begins_with("channel.prediction"):
 				prediction_info = event_data
 			if event_type_str == "channel.raid":
-				if channels.has(event_data["to_broadcaster_user_id"]):
-					twitch_node._process_twitch_event(EventType.CHANNEL_INCOMING_RAID, event_data)
-					return
-				if channels.has(event_data["from_broadcaster_user_id"]):
-					twitch_node._process_twitch_event(EventType.CHANNEL_OUTGOING_RAID, event_data)
-					return
+				for connection in connections:
+					if connection["channel_id"] == event_data["to_broadcaster_user_id"]:
+						twitch_node._process_twitch_event(EventType.CHANNEL_INCOMING_RAID, event_data)
+					if connection["channel_id"] == event_data["from_broadcaster_user_id"]:
+						twitch_node._process_twitch_event(EventType.CHANNEL_OUTGOING_RAID, event_data)
+				return
 			for event_type in events.keys():
 				if events[event_type].type == event_type_str:
 					twitch_node._process_twitch_event(event_type, event_data)
@@ -984,77 +1058,256 @@ func _process_message(message_data: Dictionary) -> void:
 		"session_keepalive":
 			pass
 		"session_reconnect":
+			print("Received reconnect message: %s" % JSON.stringify(message_data,"\t"))
 			_reconnect_twitch_websocket(message_data["payload"]["session"]["reconnect_url"])
 		_:
 			printerr("Unknown Twitch message type recieved: %s" % message_data["metadata"]["message_type"])
 			printerr("Full message: %s" % message_data)
 
+
 func _validation_loop() -> void:
 	while true:
-		_validate_token(encrypted_credentials["channel"], "channel")
-		_validate_token(encrypted_credentials["user"], "user")
+		var tokens: Dictionary = credentials.get("tokens", {})
+		for user_id in tokens:
+			var validation_info := await _validate_token(tokens[user_id]["access_token"])
+			var validation_user_id = validation_info.get("user_id", "")
+			if validation_user_id != "":
+				if validation_user_id != user_id:
+					printerr("Validated token belongs to a different user: %s instead of %s" % [validation_user_id, user_id])
+					tokens[validation_user_id] = tokens[user_id]
+					tokens.erase(user_id)
+					user_id = validation_user_id
+				var scopes: Array[String]
+				scopes.assign(validation_info.get("scopes", []))
+				tokens[validation_user_id]["scopes"] = scopes
+				tokens[validation_user_id]["state"] = TwitchNode.TokenState.VALID
+			elif validation_info.get("status", 0) == 401:
+				tokens[user_id]["state"] = TwitchNode.TokenState.INVALID
+				var user_info := await _get_user_info(user_id)
+				twitch_node.error_occured.emit(TwitchNode.ErrorCode.INVALID_TOKEN, {"username" : user_info.get("login", "")})
+			else:
+				printerr("Unkown response from token validation: %s" % validation_info)
+				tokens[user_id]["state"] = TwitchNode.TokenState.UNKNOWN
+			twitch_node.token_validated.emit(validation_info.get("login", ""), tokens[user_id]["state"])
 		await get_tree().create_timer(3599).timeout
 
-func _validate_token(encrypted_token: PackedByteArray, account: String) -> void:
-	token_states[account] = TwitchNode.TokenState.CHECKING
-	if encrypted_token.is_empty():
-		token_states[account] = TwitchNode.TokenState.EMPTY
-		twitch_node.token_validated.emit(account, TwitchNode.TokenState.EMPTY)
-	var header: PackedStringArray = ["Authorization: OAuth " + crypto.decrypt(key, encrypted_token).get_string_from_utf8()]
+func _validate_token(encrypted_access_token: PackedByteArray) -> Dictionary:
+	var header: PackedStringArray = ["Authorization: OAuth " + crypto.decrypt(key, encrypted_access_token).get_string_from_utf8()]
 	var http_request := HTTPRequest.new()
+	http_request.use_threads = true
 	add_child(http_request)
 	http_request.request(validate_uri, header, HTTPClient.METHOD_GET)
 	var response: Array = await http_request.request_completed
 	http_request.queue_free()
-	if response[1] == 200:
-		token_states[account] = TwitchNode.TokenState.VALID
-		twitch_node.token_validated.emit(account, TwitchNode.TokenState.VALID)
-	elif response[1] == 401:
-		printerr("Token invalid")
-		token_states[account] = TwitchNode.TokenState.INVALID
-		twitch_node.token_validated.emit(account, TwitchNode.TokenState.INVALID)
-		twitch_node.error_occured.emit(TwitchNode.ErrorCode.INVALID_TOKEN, account)
+	if response.size() > 1 && (response[1] == 200 || response[1] == 401):
+		var validation_info: Dictionary = JSON.parse_string(response[3].get_string_from_utf8())
+		return validation_info
 	else:
 		printerr("Unexpected response on token validation request: %s" % [response])
+		return {}
 
-func set_credentials(client_id: String, channel_token: String, user_token: String, store: bool) -> void:
+func add_token(_token: String, auth_type: TwitchNode.AuthType, _scopes: Array[String], _redirect_uri: String) -> String:
+	var user_id: String
+	var encrypted_access_token := crypto.encrypt(key, _token.to_utf8_buffer())
+	var encrypted_refresh_token: PackedByteArray
+	var real_scopes: Array[String] = []
+	var state: TwitchNode.TokenState
+
+	match auth_type:
+		TwitchNode.AuthType.AUTH_CODE:
+			var result := await _request_token(_token, _redirect_uri, "")
+			if result.is_empty():
+				printerr("Error: token request failed when adding token")
+				return ""
+			else:
+				encrypted_access_token = crypto.encrypt(key, result.get("access_token").to_utf8_buffer())
+				encrypted_refresh_token = crypto.encrypt(key, result.get("refresh_token").to_utf8_buffer())
+		TwitchNode.AuthType.IMPLICIT:
+			encrypted_access_token = crypto.encrypt(key, _token.to_utf8_buffer())
+
+	var result := await _validate_token(encrypted_access_token)
+	if result.get("status", 200) == 401:
+		return ""
+	elif result.is_empty():
+		printerr("Error: token validation failed when adding token")
+		return ""
+	else:
+		real_scopes.assign(result["scopes"])
+		user_id = result["user_id"]
+	for scope in _scopes:
+		assert(real_scopes.has(scope), "Add token error: scope %s passed in input not present in real token scope")
+	for scope in real_scopes:
+		assert(_scopes.has(scope), "Add token error: scope %s in real token scope not passed in input")
+	var expires_at: int = Time.get_unix_time_from_system() + result["expires_in"]
+	if !credentials.has("tokens"):
+		credentials["tokens"] = {}
+	credentials["tokens"][user_id] = { "auth_type" : auth_type, "access_token" : encrypted_access_token, "scopes" : real_scopes, "state" : TwitchNode.TokenState.VALID, "expires_at" : expires_at}
+	if auth_type == TwitchNode.AuthType.AUTH_CODE:
+		credentials["tokens"][user_id]["refresh_token"] = encrypted_refresh_token
+		_refresh_token_cycle(user_id)
+	if store_credentials:
+		_store_credentials()
+	var user_info := await _get_user_info(user_id)
+	twitch_node.token_validated.emit(user_info["login"], credentials["tokens"][user_id]["state"])
+	return user_info.get("login", "")
+
+func delete_token(account: String) -> void:
+	var tokens: Dictionary = credentials.get("tokens", {})
+	await _check_user_ids([account])
+	var user_id = user_list[account]
+	tokens.erase(user_id)
+	if store_credentials:
+		_store_credentials()
+	twitch_node.token_validated.emit(account, TwitchNode.TokenState.DELETED)
+
+func set_credentials(client_id: String, client_secret: String, store: bool) -> void:
 	if client_id != "":
-		encrypted_credentials["client_id"] = crypto.encrypt(key, client_id.to_utf8_buffer())
-	if channel_token != "":
-		encrypted_credentials["channel"] = crypto.encrypt(key, channel_token.to_utf8_buffer())
-		_validate_token(encrypted_credentials["channel"], "channel")
-	if user_token != "":
-		encrypted_credentials["user"] = crypto.encrypt(key, user_token.to_utf8_buffer()) 
-		_validate_token(encrypted_credentials["user"], "user")
+		credentials["client_id"] = crypto.encrypt(key, client_id.to_utf8_buffer())
+	if client_secret != "":
+		credentials["client_secret"] = crypto.encrypt(key, client_secret.to_utf8_buffer())
+	store_credentials = store
 	if store:
 		_store_credentials()
 
+func get_token_accounts() -> Array[String]:
+	var user_ids: Array[String]
+	user_ids.assign(credentials.get("tokens", {}).keys())
+	var usernames: Array[String]
+	for user_id in user_ids:
+		var user_info := await _get_user_info(user_id)
+		var username: String = user_info.get("login", "")
+		if username == "":
+			printerr("Error getting token accounts: user id %s not found" % user_id)
+		else:
+			usernames.append(username)
+	return usernames
+
+func _request_token(authorization_code: String, redirect_uri: String, account: String) -> Dictionary:
+	var query_parameters := {
+		"client_id": crypto.decrypt(key,credentials["client_id"]).get_string_from_utf8(),
+		"client_secret": crypto.decrypt(key,credentials["client_secret"]).get_string_from_utf8(),
+		"code": authorization_code,
+		"grant_type": "authorization_code",
+		"redirect_uri": "%s" % [redirect_uri],
+	}
+	var request := HTTPRequest.new()
+	request.use_threads = true
+	add_child(request)
+	var headers: PackedStringArray = ["Content-Type: application/x-www-form-urlencoded"]
+	request.request("%s?%s" % [token_uri,HTTPClient.new().query_string_from_dict(query_parameters)],headers,HTTPClient.METHOD_POST, "")
+	var result: Array = await request.request_completed
+	request.queue_free()
+	if result.size() < 4 || result[0] != 0 || result[1] < 200 || result[1] > 299:
+		var error_details: String
+		if !result.is_empty():
+			error_details += "Result code %s" % result[0]
+		if result.size() > 1:
+			error_details += ", response code %s" % result[1]
+		if result.size() > 3:
+			error_details += ", %s" % result[3].get_string_from_utf8()
+		printerr("Error requesting refresh token: %s" % [error_details])
+		return {}
+	var response_body: Dictionary = JSON.parse_string(result[3].get_string_from_utf8())
+	if response_body.is_empty():
+		printerr("Error requesting refresh token: empty response body, %s" % [result])
+	return response_body
+
+func _refresh_token_cycle(user_id: String) -> void:
+	if credentials.get("tokens", {}).get(user_id, {}).get("refresh_token", "").is_empty():
+		printerr("Can't run refresh cycle without refresh token for user id %s" % user_id)
+		return
+	token_refresh_running[user_id] = true
+	while true:
+		var user_credentials: Dictionary = credentials.get("tokens", {}).get(user_id, {})
+		if user_credentials.is_empty():
+			printerr("Stopping refresh cycle for userid %s: credentials removed" % user_id)
+			token_refresh_running.erase(user_id)
+			return
+		var auth_type: TwitchNode.AuthType = user_credentials.get("auth_type", 0)
+		if auth_type != TwitchNode.AuthType.AUTH_CODE:
+			printerr("Stopping refresh cycle for userid %s: auth type changed" % user_id)
+			token_refresh_running[user_id] = false
+			return
+		var refresh_token: PackedByteArray = user_credentials.get("refresh_token", [])
+		if refresh_token.is_empty():
+			printerr("Stopping refresh cycle for userid %s: no refresh token" % user_id)
+		var expires_at: int = user_credentials.get("expires_at", 0)
+		if expires_at == 0:
+			printerr("Stopping refresh cycle for userid %s: not expire time info" % user_id)
+			token_refresh_running[user_id] = false
+			return
+		var lifetime: int = expires_at - Time.get_unix_time_from_system()
+		if lifetime > 60:
+			await get_tree().create_timer(min(60, lifetime - 60)).timeout
+		else:
+			user_credentials["state"] = TwitchNode.TokenState.REFRESHING
+			var query_parameters := {
+				"client_id": crypto.decrypt(key, credentials["client_id"]).get_string_from_utf8(),
+				"client_secret": crypto.decrypt(key, credentials["client_secret"]).get_string_from_utf8(),
+				"grant_type": "refresh_token",
+				"refresh_token": crypto.decrypt(key, refresh_token).get_string_from_utf8(),
+			}
+			var request := HTTPRequest.new()
+			request.use_threads = true
+			add_child(request)
+			# print("%s?%s" % [token_uri, HTTPClient.new().query_string_from_dict(query_parameters)])
+			request.request("%s?%s" % [token_uri, HTTPClient.new().query_string_from_dict(query_parameters)], [], HTTPClient.METHOD_POST, "")
+			var result: Array = await request.request_completed
+			request.queue_free()
+			if result.size() < 4 || result[0] != 0 || result[1] < 200 || result[1] > 299:
+				printerr("Error refreshing token for userid %s: %s" % [user_id, result])
+				token_refresh_running[user_id] = false
+				user_credentials["state"] = TwitchNode.TokenState.INVALID
+				# TODO: handle failures and update state
+				return
+			var response_body: Dictionary = JSON.parse_string(result[3].get_string_from_utf8())
+			if !response_body.is_empty():
+				user_credentials["access_token"] = crypto.encrypt(key,response_body["access_token"].to_utf8_buffer())
+				if response_body.get("refresh_token", "") != "":
+					user_credentials["refresh_token"] = crypto.encrypt(key,response_body["refresh_token"].to_utf8_buffer())
+				user_credentials["state"] = TwitchNode.TokenState.VALID
+				user_credentials["expires_at"] = floori(Time.get_unix_time_from_system()) + response_body["expires_in"]
+				_store_credentials()
+			else:
+				printerr("Error refreshing token for userid %s: %s" % [user_id, result])
+				token_refresh_running[user_id] = false
+				user_credentials["state"] = TwitchNode.TokenState.INVALID
+			var user_info := await _get_user_info(user_id)
+			twitch_node.token_validated.emit(user_info["login"], user_credentials["state"])
+
 func _init_credentials() -> bool:
 	_init_key()
-	encrypted_credentials["version"] = "0.2"
-	encrypted_credentials["client_id"] = []
-	encrypted_credentials["channel"] = []
-	encrypted_credentials["user"] = []
+	credentials["version"] = "2.0"
+	credentials["client_id"] = []
+	credentials["client_secret"] = []
 	_load_credentials()
-	return !encrypted_credentials["client_id"].is_empty() && !encrypted_credentials["channel"].is_empty() && !encrypted_credentials["user"].is_empty()
+	return !credentials["client_id"].is_empty()
 
 func _store_credentials() -> void:
 	if !DirAccess.dir_exists_absolute("user://TwitchNode"):
 		DirAccess.make_dir_absolute("user://TwitchNode")
 	var file = FileAccess.open("user://TwitchNode/twitch_credentials", FileAccess.WRITE)
-	file.store_buffer(var_to_bytes(encrypted_credentials))
+	file.store_buffer(var_to_bytes(credentials))
 
 func _load_credentials() -> bool:
 	if FileAccess.file_exists("user://twitch_credentials"):
 		var file := FileAccess.open("user://twitch_credentials", FileAccess.READ)
-		encrypted_credentials = bytes_to_var(file.get_buffer(file.get_length()))
-		encrypted_credentials["version"] = "0.2"
+		credentials = bytes_to_var(file.get_buffer(file.get_length()))
+		credentials["version"] = "0.2"
 		_store_credentials()
 		DirAccess.remove_absolute("user://twitch_credentials")
 		return true
 	elif FileAccess.file_exists("user://TwitchNode/twitch_credentials"):
 		var file := FileAccess.open("user://TwitchNode/twitch_credentials", FileAccess.READ)
-		encrypted_credentials = bytes_to_var(file.get_buffer(file.get_length()))
+		credentials = bytes_to_var(file.get_buffer(file.get_length()))
+		if credentials["version"] != "2.0":
+			credentials["version"] = "2.0"
+			credentials.erase("auth_type")
+			credentials.erase("channel")
+			credentials.erase("user")
+			credentials.erase("channel_refresh_token")
+			credentials.erase("user_refresh_token")
+		store_credentials = true
 		return true
 	else:
 		return false

@@ -4,76 +4,47 @@ const twitch_auth_scene: PackedScene = preload("res://addons/twitch_node/auth_wi
 const months_length: Array[int] = [0,31,28,31,30,31,30,31,31,30,31,30,31]
 const weekdays: Array[String] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
 
-@export var channel_name: String
-@export var bot_account_name: String
-
 @export var twitch_node: TwitchNode
 @export var scroll_container: ScrollContainer
 @export var info_container: Container
 @export var poll_label: Label
 @export var hypetrain_label: Label
+@export var settings_bar: SettingsBar
 var twitch_auth_window: TwitchAuthWindow
+var label_queue: Array[RichTextLabel]
 
 func _ready() -> void:
 	poll_label.visible = false
 	hypetrain_label.visible = false
-	if channel_name != "":
-		twitch_node.new_chat_message.connect(on_new_chat_message)
-		twitch_node.new_follower.connect(on_new_follower)
-		twitch_node.new_sub.connect(on_new_sub)
-		twitch_node.resub.connect(on_resub)
-		twitch_node.end_sub.connect(on_end_sub)
-		twitch_node.gift_subs.connect(on_gift_subs)
-		twitch_node.vip_added.connect(on_vip_added)
-		twitch_node.vip_removed.connect(on_vip_removed)
-		twitch_node.poll_started.connect(on_poll_started)
-		twitch_node.poll_progress.connect(on_poll_progress)
-		twitch_node.poll_ended.connect(on_poll_ended)
-		twitch_node.incoming_raid.connect(on_incoming_raid)
-		twitch_node.bits_cheered.connect(on_bits_cheered)
-		twitch_node.hype_train_started.connect(on_hype_train_started)
-		twitch_node.hype_train_progress.connect(on_hype_train_progress)
-		twitch_node.hype_train_ended.connect(on_hype_train_ended)
-		twitch_node.stream_started.connect(on_stream_started)
-		twitch_node.stream_ended.connect(on_stream_ended)
-		twitch_node.ad_break_started.connect(on_ad_break_started)
-		_connect_to_channel()
-	else:
-		printerr("No channel name provided")
-	if bot_account_name == "":
-		printerr("No bot account provided")
-
-func _connect_to_channel() -> void:
-	if await twitch_node.has_valid_credentials():
-		if twitch_node.token_validated.is_connected(on_token_validated):
-			twitch_node.token_validated.disconnect(on_token_validated)
-		twitch_node.connect_to_channel(channel_name)
-	elif twitch_auth_window == null:
-		twitch_auth_window = twitch_auth_scene.instantiate()
-		twitch_auth_window.set_twitch_node(twitch_node)
-		add_child(twitch_auth_window)
-		twitch_node.token_validated.connect(on_token_validated)
-
-func on_token_validated(_account: String, _token_state: TwitchNode.TokenState) -> void:
-	_connect_to_channel()
-
-func on_auth_button_pressed() -> void:
-	if twitch_auth_window == null:
-		twitch_auth_window = twitch_auth_scene.instantiate()
-		twitch_auth_window.set_twitch_node(twitch_node)
-		add_child(twitch_auth_window)
-	else:
-		twitch_auth_window.grab_focus.call_deferred()
+	twitch_node.new_chat_message.connect(on_new_chat_message)
+	twitch_node.new_follower.connect(on_new_follower)
+	twitch_node.new_sub.connect(on_new_sub)
+	twitch_node.resub.connect(on_resub)
+	twitch_node.end_sub.connect(on_end_sub)
+	twitch_node.gift_subs.connect(on_gift_subs)
+	twitch_node.vip_added.connect(on_vip_added)
+	twitch_node.vip_removed.connect(on_vip_removed)
+	twitch_node.poll_started.connect(on_poll_started)
+	twitch_node.poll_progress.connect(on_poll_progress)
+	twitch_node.poll_ended.connect(on_poll_ended)
+	twitch_node.incoming_raid.connect(on_incoming_raid)
+	twitch_node.bits_cheered.connect(on_bits_cheered)
+	twitch_node.hype_train_started.connect(on_hype_train_started)
+	twitch_node.hype_train_progress.connect(on_hype_train_progress)
+	twitch_node.hype_train_ended.connect(on_hype_train_ended)
+	twitch_node.stream_started.connect(on_stream_started)
+	twitch_node.stream_ended.connect(on_stream_ended)
+	twitch_node.ad_break_started.connect(on_ad_break_started)
 
 func on_new_chat_message(_channel: String, _user: String, _message: String, _event_data: Dictionary) -> void:
 	var color_hex: String = _event_data["color"]
-	_add_label("[color=%s]%s[/color]: %s" % [color_hex, _user, _message])
+	_add_label("(%s) [color=%s]%s[/color]: %s" % [_channel, color_hex, _user, _message])
 	if _message.begins_with("!"):
-		process_command(_user, _message)
+		process_command(_channel, _user, _message)
 
 func on_new_follower(_channel: String, _follower: String, _event_data: Dictionary) -> void:
 	_add_label("New follower: %s" % _follower)
-	twitch_node.send_chat_message(channel_name, bot_account_name, "Thanks for the follow %s!" % _follower)
+	twitch_node.send_chat_message(_channel, settings_bar.get_user_account(), "Thanks for the follow %s!" % _follower)
 
 func on_new_sub(_channel: String, _subscriber: String, _tier: int, _event_data: Dictionary) -> void:
 	_add_label("New tier %s sub: %s" % [_tier, _subscriber])
@@ -127,7 +98,7 @@ func on_poll_ended(_channel: String, _title: String, _choices: Array[String], _v
 
 func on_incoming_raid(_channel: String, _raiding_channel: String, _party_size: int, _event_data: Dictionary) -> void:
 	_add_label("%s is raiding with a party of %s" % [_raiding_channel, _party_size])
-	twitch_node.send_shoutout(channel_name, _raiding_channel)
+	twitch_node.send_shoutout(_channel, _channel, _raiding_channel)
 
 func on_bits_cheered(_channel: String, _user: String, _amount: int, _message: String, _event_data: Dictionary) -> void:
 	_add_label("%s cheered %s bits: %s" % [_user, _amount, _message])
@@ -156,34 +127,36 @@ func on_stream_ended(_channel: String, _event_data: Dictionary) -> void:
 	_add_label("%s is now offline" % _channel)
 
 func on_ad_break_started(_channel: String, _duration: int, _event_data: Dictionary) -> void:
-	twitch_node.send_chat_message(channel_name, bot_account_name, "Ads are starting BigSad")
+	var account := settings_bar.get_user_account()
+	twitch_node.send_chat_message(_channel, account, "Ads are starting BigSad")
 	await get_tree().create_timer(_duration).timeout
-	twitch_node.send_chat_message(channel_name, bot_account_name, "Ads are over! DinoDance")
+	twitch_node.send_chat_message(_channel, account, "Ads are over! DinoDance")
 
-func process_command(_user: String, _message: String) -> void:
+func process_command(_channel: String, _user: String, _message: String) -> void:
+	var account := settings_bar.get_user_account()
 	if _message.begins_with("!ping"):
-		twitch_node.send_chat_message(channel_name, bot_account_name, "Pong!")
+		twitch_node.send_chat_message(_channel, settings_bar.get_user_account(), "Pong!")
 	if _message.begins_with("!followage"):
 		var user := _user
 		var split := _message.split(" ")
 		if split.size() > 1:
 			user = split[1].to_lower()
-		twitch_node.send_chat_message(channel_name, bot_account_name, await _followage(user))
+		twitch_node.send_chat_message(_channel, account, await _followage(_channel, _channel, user))
 	if _message.begins_with("!privilege"):
 		var user := _user
 		var split := _message.split(" ")
 		if split.size() > 1:
 			user = split[1].to_lower()
-		var msg := await _followage(user)
-		msg += ". " + await _subbage(user)
-		msg += ". " + await _moddage(user)
-		msg += ". " + await _vippage(user) + "."
-		twitch_node.send_chat_message(channel_name, bot_account_name, msg)
+		var msg := await _followage(_channel, _channel, user)
+		msg += ". " + await _subbage(_channel, user)
+		msg += ". " + await _moddage(_channel, _channel, user)
+		msg += ". " + await _vippage(_channel, user) + "."
+		twitch_node.send_chat_message(_channel, account, msg)
 	if _message.begins_with("!ads"):
-		_ads(_user)
+		_ads(_channel, account)
 
-func _followage(user: String) -> String:
-		var follower_info := await twitch_node.get_follower_info(channel_name, user)
+func _followage(channel: String, account: String, user: String) -> String:
+		var follower_info := await twitch_node.get_follower_info(channel, account, user)
 		if !follower_info.is_empty():
 			var followed_time_dict := Time.get_datetime_dict_from_datetime_string(str(follower_info["followed_at"]), true)
 			var weekday: int = followed_time_dict["weekday"]
@@ -219,8 +192,8 @@ func _followage(user: String) -> String:
 		else:
 			return "%s is not following the channel" % user
 
-func _subbage(user: String) -> String:
-	var sub_info := await twitch_node.get_sub_info(channel_name, user)
+func _subbage(channel: String, user: String) -> String:
+	var sub_info := await twitch_node.get_sub_info(channel, user)
 	if sub_info.is_empty():
 		return "They are not subbed"
 	else:
@@ -230,24 +203,24 @@ func _subbage(user: String) -> String:
 		else:
 			return "They received a tier %s gift sub from %s" % [tier, sub_info["gifter_name"]]
 
-func _moddage(user: String) -> String:
-	if await twitch_node.is_moderator(channel_name, user):
+func _moddage(channel: String, account: String, user: String) -> String:
+	if await twitch_node.is_moderator(channel, account, user):
 		return "They are a mod"
 	else:
 		return "They are not a mod"
 
-func _vippage(user: String) -> String:
-	if await twitch_node.is_vip(channel_name, user):
+func _vippage(channel: String, user: String) -> String:
+	if await twitch_node.is_vip(channel, user):
 		return "They are a vip"
 	else:
 		return "They are not a vip"
 
-func _ads(_user: String) -> void:
-	var ad_info := await twitch_node.get_ad_schedule(channel_name)
+func _ads(_channel: String, _account: String) -> void:
+	var ad_info := await twitch_node.get_ad_schedule(_channel)
 	var ads_in_s: int = ad_info["next_ad_at"] - Time.get_unix_time_from_system()
 	var minutes: int = floori(ads_in_s / 60.)
 	var seconds: int = ads_in_s % 60
-	twitch_node.send_chat_message(channel_name, bot_account_name, "Ads will play in %s minutes and %s seconds" % [minutes, seconds])
+	twitch_node.send_chat_message(_channel, _account, "Ads will play in %s minutes and %s seconds" % [minutes, seconds])
 
 func _add_label(_text: String) -> void:
 	var label := RichTextLabel.new()
@@ -256,6 +229,10 @@ func _add_label(_text: String) -> void:
 	label.text = _text
 	info_container.add_child(label)
 	_scroll_down()
+	label_queue.push_back(label)
+	while label_queue.size() > 100:
+		var old_label: RichTextLabel = label_queue.pop_front()
+		old_label.queue_free()
 
 func _scroll_down() -> void:
 	await get_tree().process_frame
