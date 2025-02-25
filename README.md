@@ -12,7 +12,7 @@ TwitchNode is a Godot library for easy interfacing with Twitch from GDScript. It
 - Built in rate limiting to prevent you from getting into trouble when accidentally launching too many requests
 
 ## Release notes
-24/02/2024: Breaking changes due to autentication refactoring:
+25/02/2024: Breaking changes due to authentication refactoring:
 
 - Access tokens need to be regenerated
 - The following functions require an additional input parameter to indicate which account needs to be used for authentication: send_shoutout, warn_user, ban_user, get_follower_info, get_followers, get_next_followers, is_moderator, get_moderators, get_next_moderators
@@ -47,7 +47,7 @@ Access tokens generated with the `Implicit` grant flow expire after around 50 da
 
 ## Use
 You can use this addon by adding a `TwitchNode` node to your scene. Make sure you only have one active TwitchNode in your program at any time, to prevent unexpected behaviour.
-To start listening for channel events, call the `connect_to_channel` function of the TwitchNode. You can connect to the signals of the TwitchNode to get called when events happen like new chat messages, new followers etc. Use the functions of the TwitchNode to perform actions like sending messages, starting polls etc. The channelname passed in input should be the channel for which an access token has been created.
+To start listening for channel events, call the `connect_to_channel` function of the TwitchNode. You can connect to the signals of the TwitchNode to get called when events happen like new chat messages, new followers etc. Use the functions of the TwitchNode to perform actions like sending messages, starting polls etc.
 
 ![adding_twitchnode](./documentation/adding_twitchnode.png)
 
