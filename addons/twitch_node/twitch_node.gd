@@ -57,8 +57,8 @@ func _ready() -> void:
 	add_child(_twitch_api)
 
 ## Connect to channel to trigger signals when events happen in the channel (incoming chat messages, subs, follows, ...) (see list of signals). 
-## Uses the access token of user passed as username.
-func connect_to_channel(channel: String, auth_username: String = "") -> void:
+## Will only trigger the signals that are covered by the scope of the token for auth_username
+func connect_to_channel(channel: String, auth_username: String) -> void:
 	await _twitch_api.connect_to_channel(channel, auth_username)
 
 func send_chat_message(channel: String, username: String, message: String) -> void:

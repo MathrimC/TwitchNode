@@ -220,16 +220,16 @@ func _ready() -> void:
 	_rate_limit_loop()
 	_request_cleanup_loop()
 
-func connect_to_channel(channel: String, username: String = "") -> void:
-	var usernames: Array[String] = [channel, username]
+func connect_to_channel(channel: String, auth_username: String) -> void:
+	var usernames: Array[String] = [channel, auth_username]
 	if !await _check_user_ids(usernames):
 		printerr("Can't connect to channel due to missing channel id")
 		return
 	var channel_id = user_list[channel]
-	var user_id = user_list[username]
+	var user_id = user_list[auth_username]
 	var token_info: Dictionary = credentials.get("tokens", {}).get(user_id, {})
 	if token_info.is_empty():
-		printerr("Can't connect to channel due to missing token for user %s" % username)
+		printerr("Can't connect to channel due to missing token for user %s" % auth_username)
 		return
 	var token_state: TwitchNode.TokenState = token_info.get("state", TwitchNode.TokenState.EMPTY)
 	while token_state == TwitchNode.TokenState.CHECKING \
@@ -237,7 +237,7 @@ func connect_to_channel(channel: String, username: String = "") -> void:
 		await twitch_node.token_validated
 		token_state = token_info.get("state", TwitchNode.TokenState.EMPTY)
 	if token_state != TwitchNode.TokenState.VALID:
-		printerr("Can't connect to channel due to invalid token for user %s" % username)
+		printerr("Can't connect to channel due to invalid token for user %s" % auth_username)
 		return
 	if session_id == "":
 		_connect_twitch_websocket()
