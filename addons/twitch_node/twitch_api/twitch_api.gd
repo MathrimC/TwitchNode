@@ -935,6 +935,7 @@ func _execute_request(api_operation: TwitchAPIRequest.APIOperation, user_id: Str
 		var tokens: Dictionary = credentials.get("tokens", {})
 		if tokens.is_empty():
 			printerr("Error executing request operation %s: no tokens available" % api_operation)
+			return request
 		user_id = tokens.keys()[0]
 	request.set_request_data(self, user_id, api_operation, body, query_parameters)
 	if rate_limit_remaining > 0:
@@ -1069,6 +1070,8 @@ func _validation_loop() -> void:
 	while true:
 		var tokens: Dictionary = credentials.get("tokens", {})
 		for user_id in tokens:
+			if tokens[user_id].get("state", TwitchNode.TokenState.UNKNOWN) == TwitchNode.TokenState.REFRESHING:
+				continue
 			var validation_info := await _validate_token(tokens[user_id]["access_token"])
 			var validation_user_id = validation_info.get("user_id", "")
 			if validation_user_id != "":
