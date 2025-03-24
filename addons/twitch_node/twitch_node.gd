@@ -185,8 +185,8 @@ func get_next_moderators(channel: String, auth_username: String) -> Dictionary:
 		_moderators_page = ""
 	return response
 
-func create_poll(channel: String, poll_title: String, poll_choices: Array[String], poll_duration: int) -> void:
-	_twitch_api.create_poll(channel, poll_title, poll_choices, poll_duration)
+func create_poll(channel: String, poll_title: String, poll_choices: Array[String], poll_duration: int, points_enabled: bool = false, points_per_vote: int = 100) -> void:
+	_twitch_api.create_poll(channel, poll_title, poll_choices, poll_duration, points_enabled, points_per_vote)
 
 func create_prediction(channel: String, prediction_title: String, prediction_outcomes: Array[String], prediction_duration_s: int) -> void:
 	_twitch_api.create_prediction(channel, prediction_title, prediction_outcomes, prediction_duration_s)

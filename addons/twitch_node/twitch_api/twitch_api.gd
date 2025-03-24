@@ -644,7 +644,7 @@ func get_moderators(channel: String, auth_username: String, page: String = "", u
 		printerr("Can't get moderators due to missing channel id or auth user id")
 		return {}
 
-func create_poll(channel: String, poll_title: String, poll_choices: Array[String], poll_duration: int) -> void:
+func create_poll(channel: String, poll_title: String, poll_choices: Array[String], poll_duration: int, points_enabled: bool = false, points_per_vote: int = 100) -> void:
 	if await _check_user_ids([channel]):
 		var channel_id = user_list[channel]
 		var body := { 
@@ -655,6 +655,10 @@ func create_poll(channel: String, poll_title: String, poll_choices: Array[String
 		}
 		for choice: String in poll_choices:
 			body["choices"].append({ "title" : choice.left(25)})
+		print("creating poll, points enabled: %s" % points_enabled)
+		if points_enabled:
+			body["channel_points_voting_enabled"] = points_enabled
+			body["channel_points_per_vote"] = points_per_vote
 		_execute_request(TwitchAPIRequest.APIOperation.CREATE_POLL, channel_id, body)
 	else:
 		printerr("Can't create poll due to missing channel id")
