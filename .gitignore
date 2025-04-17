@@ -9,4 +9,4 @@ documentation/*.import
 icon.*
 project.godot
 
-test_functions.gd
+test_functions.*

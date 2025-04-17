@@ -1,8 +1,8 @@
 [gd_scene load_steps=7 format=3 uid="uid://c7kyntgy4sqt6"]
 
-[ext_resource type="Script" path="res://addons/twitch_node/auth_window/twitch_auth_window.gd" id="1_fpl08"]
-[ext_resource type="Script" path="res://addons/twitch_node/auth_window/twitch_auth.gd" id="2_2sx86"]
-[ext_resource type="Script" path="res://addons/twitch_node/auth_window/scopes_button.gd" id="3_d2y36"]
+[ext_resource type="Script" uid="uid://bio784wapy52a" path="res://addons/twitch_node/auth_window/twitch_auth_window.gd" id="1_fpl08"]
+[ext_resource type="Script" uid="uid://bn4ggs2fgkfil" path="res://addons/twitch_node/auth_window/twitch_auth.gd" id="2_2sx86"]
+[ext_resource type="Script" uid="uid://dji263beib6i3" path="res://addons/twitch_node/auth_window/scopes_button.gd" id="3_d2y36"]
 [ext_resource type="PackedScene" uid="uid://d7yuxq0qv4y8" path="res://addons/twitch_node/auth_window/token_line.tscn" id="3_sh2bu"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hyf55"]

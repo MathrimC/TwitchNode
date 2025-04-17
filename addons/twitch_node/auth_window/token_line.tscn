@@ -1,6 +1,6 @@
 [gd_scene load_steps=2 format=3 uid="uid://d7yuxq0qv4y8"]
 
-[ext_resource type="Script" path="res://addons/twitch_node/auth_window/token_line.gd" id="1_gpmxp"]
+[ext_resource type="Script" uid="uid://b2ar480wgcjs3" path="res://addons/twitch_node/auth_window/token_line.gd" id="1_gpmxp"]
 
 [node name="TokenLine" type="HBoxContainer" node_paths=PackedStringArray("username_label", "status_label", "scopes_button", "delete_button")]
 script = ExtResource("1_gpmxp")

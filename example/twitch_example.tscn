@@ -1,8 +1,8 @@
 [gd_scene load_steps=4 format=3 uid="uid://l6pn8orfewf0"]
 
-[ext_resource type="Script" path="res://example/twitch_example.gd" id="1_od6ma"]
-[ext_resource type="Script" path="res://addons/twitch_node/twitch_node.gd" id="2_g4gm0"]
-[ext_resource type="Script" path="res://example/settings_bar.gd" id="2_p3c7t"]
+[ext_resource type="Script" uid="uid://d1xawj3t6ow1k" path="res://example/twitch_example.gd" id="1_od6ma"]
+[ext_resource type="Script" uid="uid://caja6jeudnrcw" path="res://addons/twitch_node/twitch_node.gd" id="2_g4gm0"]
+[ext_resource type="Script" uid="uid://k5jq2jn7ecpe" path="res://example/settings_bar.gd" id="2_p3c7t"]
 
 [node name="TwitchExample" type="Node" node_paths=PackedStringArray("twitch_node", "scroll_container", "info_container", "poll_label", "hypetrain_label", "settings_bar")]
 script = ExtResource("1_od6ma")

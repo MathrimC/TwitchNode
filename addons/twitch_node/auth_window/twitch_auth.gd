@@ -110,7 +110,7 @@ func _process(_delta: float) -> void:
 		var byte_count := connection.get_available_bytes()
 		var request = connection.get_utf8_string(byte_count)
 		if request.begins_with("GET"):
-			connection.put_data(("HTTP/1.1 %d\r\n" % 200).to_ascii_buffer())
+			connection.put_data(("HTTP/1.1 %d\r\n\n" % 200).to_ascii_buffer())
 			connection.put_data(_get_redirect_page().to_ascii_buffer())
 		elif request.begins_with("POST"):
 			var token := ""
