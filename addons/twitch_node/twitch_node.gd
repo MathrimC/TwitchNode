@@ -42,6 +42,9 @@ signal ad_break_started(channel: String, duration_s: int, event_data: Dictionary
 signal token_validated(account: String, token_state: TokenState)
 signal error_occured(error_code, error_info: Dictionary)
 
+signal connected_to_channel(channel: String, auth_username: String)
+signal disconnected_from_channel(channel: String, auth_username: String)
+
 ## Max amount of calls that can be done in one minute
 @export var rate_limit := 100
 
@@ -58,8 +61,18 @@ func _ready() -> void:
 
 ## Connect to channel to trigger signals when events happen in the channel (incoming chat messages, subs, follows, ...) (see list of signals). 
 ## Will only trigger the signals that are covered by the scope of the token for auth_username
-func connect_to_channel(channel: String, auth_username: String) -> void:
-	await _twitch_api.connect_to_channel(channel, auth_username)
+func connect_to_channel(channel: String, auth_username: String) -> bool:
+	var success := await _twitch_api.connect_to_channel(channel, auth_username)
+	if success:
+		connected_to_channel.emit(channel, auth_username)
+	return success
+
+## Disconnect the user from the channel.
+func disconnect_from_channel(channel: String, auth_username: String) -> bool:
+	var success := await _twitch_api.disconnect_from_channel(channel, auth_username)
+	if success:
+		disconnected_from_channel.emit(channel, auth_username)
+	return success
 
 func send_chat_message(channel: String, username: String, message: String) -> void:
 	_twitch_api.send_chat_message(channel, username, message)

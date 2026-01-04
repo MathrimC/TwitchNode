@@ -220,17 +220,17 @@ func _ready() -> void:
 	_rate_limit_loop()
 	_request_cleanup_loop()
 
-func connect_to_channel(channel: String, auth_username: String) -> void:
+func connect_to_channel(channel: String, auth_username: String) -> bool:
 	var usernames: Array[String] = [channel, auth_username]
 	if !await _check_user_ids(usernames):
 		printerr("Can't connect to channel due to missing channel id")
-		return
+		return false
 	var channel_id = user_list[channel]
 	var user_id = user_list[auth_username]
 	var token_info: Dictionary = credentials.get("tokens", {}).get(user_id, {})
 	if token_info.is_empty():
 		printerr("Can't connect to channel due to missing token for user %s" % auth_username)
-		return
+		return false
 	var token_state: TwitchNode.TokenState = token_info.get("state", TwitchNode.TokenState.EMPTY)
 	while token_state == TwitchNode.TokenState.CHECKING \
 			|| token_state == TwitchNode.TokenState.REFRESHING:
@@ -238,7 +238,7 @@ func connect_to_channel(channel: String, auth_username: String) -> void:
 		token_state = token_info.get("state", TwitchNode.TokenState.EMPTY)
 	if token_state != TwitchNode.TokenState.VALID:
 		printerr("Can't connect to channel due to invalid token for user %s" % auth_username)
-		return
+		return false
 	if session_id == "":
 		_connect_twitch_websocket()
 		await websocket_connected
@@ -251,6 +251,32 @@ func connect_to_channel(channel: String, auth_username: String) -> void:
 				continue
 			_execute_request(TwitchAPIRequest.APIOperation.SUBSCRIBE_TO_EVENT, user_id, _get_event_sub_body(event, channel_id, user_id), {})
 	connections.append({"channel_id": channel_id, "user_id": user_id})
+	return true
+
+func disconnect_from_channel(channel: String, auth_username: String) -> bool:
+	var usernames: Array[String] = [channel, auth_username]
+	if !await _check_user_ids(usernames):
+		printerr("Can't disconnect from channel due to missing channel id")
+		return false
+	var channel_id = user_list[channel]
+	var user_id = user_list[auth_username]
+	var connected := false
+	for i in connections.size():
+		if connections[i]["channel_id"] == channel_id && connections[i]["user_id"] == user_id:
+			connected = true
+			connections.remove_at(i)
+			break
+	if !connected:
+		printerr("Error disconnecting channel: %s was not connected to channel %s" % [auth_username, channel])
+		return false
+	var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_EVENT_SUBSCRIPTIONS, user_id)
+	for sub_info: Dictionary in request.response_body["data"]:
+		var conditions: Dictionary = sub_info["condition"]
+		if conditions.get("broadcaster_user_id", "") == channel_id \
+				|| conditions.get("to_broadcaster_user_id", "") == channel_id \
+				|| conditions.get("from_broadcaster_user_id", "") == channel_id:
+			_execute_request(TwitchAPIRequest.APIOperation.UNSUBSCRIBE_FROM_EVENT, user_id, {}, {"id": sub_info["id"]})
+	return true
 
 func send_chat_message(channel: String, username: String, message: String) -> void:
 	if await _check_user_ids([channel, username]):
@@ -655,7 +681,6 @@ func create_poll(channel: String, poll_title: String, poll_choices: Array[String
 		}
 		for choice: String in poll_choices:
 			body["choices"].append({ "title" : choice.left(25)})
-		print("creating poll, points enabled: %s" % points_enabled)
 		if points_enabled:
 			body["channel_points_voting_enabled"] = points_enabled
 			body["channel_points_per_vote"] = points_per_vote
@@ -1063,7 +1088,6 @@ func _process_message(message_data: Dictionary) -> void:
 		"session_keepalive":
 			pass
 		"session_reconnect":
-			print("Received reconnect message: %s" % JSON.stringify(message_data,"\t"))
 			_reconnect_twitch_websocket(message_data["payload"]["session"]["reconnect_url"])
 		_:
 			printerr("Unknown Twitch message type recieved: %s" % message_data["metadata"]["message_type"])
@@ -1257,7 +1281,6 @@ func _refresh_token_cycle(user_id: String) -> void:
 			var request := HTTPRequest.new()
 			request.use_threads = true
 			add_child(request)
-			# print("%s?%s" % [token_uri, HTTPClient.new().query_string_from_dict(query_parameters)])
 			request.request("%s?%s" % [token_uri, HTTPClient.new().query_string_from_dict(query_parameters)], [], HTTPClient.METHOD_POST, "")
 			var result: Array = await request.request_completed
 			request.queue_free()

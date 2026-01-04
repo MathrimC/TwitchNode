@@ -1,0 +1,19 @@
+[gd_scene load_steps=2 format=3 uid="uid://cmyya8glgjosp"]
+
+[ext_resource type="Script" uid="uid://dt4cdt60vnsw2" path="res://example/channel_info.gd" id="1_cvoay"]
+
+[node name="ChannelInfo" type="HBoxContainer" node_paths=PackedStringArray("channel_label")]
+theme_override_constants/separation = 6
+script = ExtResource("1_cvoay")
+channel_label = NodePath("ChannelName")
+
+[node name="ChannelName" type="Label" parent="."]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "MahtrimC"
+
+[node name="LeaveButton" type="Button" parent="."]
+layout_mode = 2
+text = "Leave"
+
+[connection signal="pressed" from="LeaveButton" to="." method="on_leave_pressed"]

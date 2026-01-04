@@ -10,12 +10,16 @@ const weekdays: Array[String] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Th
 @export var poll_label: Label
 @export var hypetrain_label: Label
 @export var settings_bar: SettingsBar
+@export var connection_info: Container
+@export var channel_info_scene: PackedScene
 var twitch_auth_window: TwitchAuthWindow
 var label_queue: Array[RichTextLabel]
+var channel_infos: Dictionary
 
 func _ready() -> void:
 	poll_label.visible = false
 	hypetrain_label.visible = false
+	connection_info.visible = false
 	twitch_node.new_chat_message.connect(on_new_chat_message)
 	twitch_node.new_follower.connect(on_new_follower)
 	twitch_node.new_sub.connect(on_new_sub)
@@ -35,6 +39,27 @@ func _ready() -> void:
 	twitch_node.stream_started.connect(on_stream_started)
 	twitch_node.stream_ended.connect(on_stream_ended)
 	twitch_node.ad_break_started.connect(on_ad_break_started)
+	twitch_node.connected_to_channel.connect(on_connected_to_channel)
+	twitch_node.disconnected_from_channel.connect(on_disconnected_from_channel)
+
+func on_connected_to_channel(channel: String, auth_username: String) -> void:
+	var channel_info: ChannelInfo = channel_info_scene.instantiate()
+	channel_info.channel_name = channel
+	channel_info.auth_username = auth_username
+	channel_info.leave_pressed.connect(on_channel_leave_pressed)
+	connection_info.add_child(channel_info)
+	channel_infos[channel] = channel_info
+	connection_info.visible = true
+
+func on_channel_leave_pressed(channel: String, auth_username: String) -> void:
+	twitch_node.disconnect_from_channel(channel, auth_username)
+
+func on_disconnected_from_channel(_channel: String, _auth_username: String) -> void:
+	channel_infos[_channel].queue_free()
+	channel_infos.erase(_channel)
+	if channel_infos.is_empty():
+		connection_info.visible = false
+
 
 func on_new_chat_message(_channel: String, _user: String, _message: String, _event_data: Dictionary) -> void:
 	var color_hex: String = _event_data["color"]
