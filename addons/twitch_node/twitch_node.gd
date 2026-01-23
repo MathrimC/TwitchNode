@@ -45,6 +45,10 @@ signal error_occured(error_code, error_info: Dictionary)
 signal connected_to_channel(channel: String, auth_username: String)
 signal disconnected_from_channel(channel: String, auth_username: String)
 
+# TODO: test if the two signals below are emitted correctly
+signal disconnected_from_twitch(status_code: int)
+signal reconnected_to_twitch()
+
 ## Max amount of calls that can be done in one minute
 @export var rate_limit := 100
 
@@ -73,6 +77,10 @@ func disconnect_from_channel(channel: String, auth_username: String) -> bool:
 	if success:
 		disconnected_from_channel.emit(channel, auth_username)
 	return success
+
+## Disconnect from twitch completely: closes the websocket.
+func disconnect_from_twitch() -> void:
+	_twitch_api.disconnect_from_twitch()
 
 func send_chat_message(channel: String, username: String, message: String) -> void:
 	_twitch_api.send_chat_message(channel, username, message)

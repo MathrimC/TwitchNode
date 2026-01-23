@@ -278,6 +278,26 @@ func disconnect_from_channel(channel: String, auth_username: String) -> bool:
 			_execute_request(TwitchAPIRequest.APIOperation.UNSUBSCRIBE_FROM_EVENT, user_id, {}, {"id": sub_info["id"]})
 	return true
 
+# TODO: test this
+func disconnect_from_twitch() -> void:
+	if socket.get_ready_state() != WebSocketPeer.State.STATE_CLOSED:
+		socket.close(1000, "Client disconnect")
+	session_id = ""
+	for connection in connections:
+		var channel_name: String
+		var auth_username: String
+		for username in user_list:
+			var user_id = user_list["username"]
+			if user_id == connection["channel_id"]:
+				channel_name = username
+			if user_id == connection["user_id"]:
+				auth_username = user_id
+		if !channel_name.is_empty() && !auth_username.is_empty():
+			twitch_node.disconnected_from_channel.emit(channel_name, auth_username)
+		else:
+			printerr("Error emiting disconnect signal for channel %s: can't find channel or user name" % connection["channel_id"])
+	connections.clear()
+
 func send_chat_message(channel: String, username: String, message: String) -> void:
 	if await _check_user_ids([channel, username]):
 		var channel_id = user_list.get(channel, "")
@@ -1030,7 +1050,8 @@ func _socket_poll_loop() -> void:
 			loop = false
 			var code := socket.get_close_code()
 			print("Twitch websocket closed with code: %d. Clean: %s" % [code, code != -1])
-			if code != 4001 && code != 4003:
+			twitch_node.disconnected_from_twitch.emit(code)
+			if code != 4001 && code != 4003 && code != 1000:
 				_connect_twitch_websocket()
 				await websocket_connected
 				_reconnect_to_channels()
@@ -1063,6 +1084,7 @@ func _reconnect_to_channels() -> void:
 				if (scope.begins_with("channel") || scope.begins_with("bits")) && channel_id != user_id:
 					continue
 				_execute_request(TwitchAPIRequest.APIOperation.SUBSCRIBE_TO_EVENT, user_id, _get_event_sub_body(event, channel_id, user_id), {})
+		twitch_node.reconnected_to_twitch.emit()
 
 func _process_message(message_data: Dictionary) -> void:
 	match message_data["metadata"]["message_type"]:
