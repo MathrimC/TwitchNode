@@ -226,15 +226,19 @@ func execute_request() -> void:
 	response_headers = response[2]
 	if response[0] != 0:
 		result = ErrorCode.REQUEST_ERROR
-		printerr("Request error: %s" % response[0])
+		_print_error("Request error: %s" % response[0])
 	elif response[1] > 299 || response[1] < 200:
 		result = ErrorCode.HTTP_ERROR
-		printerr("Http error: %s" % response[1])
+		_print_error("Http error: %s" % response[1])
 	else:
 		result = ErrorCode.OK
 		if !response[3].is_empty():
 			response_body = JSON.parse_string(response[3].get_string_from_utf8())
 	twitch_api_request_completed.emit(self, result)
+
+func _print_error(msg: String) -> void:
+	printerr("TwitchNode error executing %s request: %s" % [APIOperation.keys()[api_operation].capitalize(), msg])
+	printerr("Query parameters: %s\nRequest body: %s\n" % [query_parameters, request_body])
 
 func _get_request_headers() -> PackedStringArray:
 	var headers := [

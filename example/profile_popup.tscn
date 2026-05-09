@@ -1,0 +1,54 @@
+[gd_scene format=3 uid="uid://cj1y38j5dqn2b"]
+
+[ext_resource type="Script" uid="uid://ctl1xbbolwu8r" path="res://example/profile_popup.gd" id="1_4p4hy"]
+[ext_resource type="Texture2D" uid="uid://cfsbeal06h1a3" path="res://icon.svg" id="2_6p4em"]
+
+[node name="ProfilePopup" type="PopupPanel" unique_id=196194595 node_paths=PackedStringArray("profile_rect", "name_label", "date_label", "description_label")]
+oversampling_override = 1.0
+size = Vector2i(508, 135)
+visible = true
+script = ExtResource("1_4p4hy")
+profile_rect = NodePath("VBoxContainer/HBoxContainer/Pic")
+name_label = NodePath("VBoxContainer/HBoxContainer/VBoxContainer/NameLabel")
+date_label = NodePath("VBoxContainer/HBoxContainer/VBoxContainer/DateLabel")
+description_label = NodePath("VBoxContainer/Description")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=2068962978]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 4.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = -4.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=917502230]
+layout_mode = 2
+
+[node name="Pic" type="TextureRect" parent="VBoxContainer/HBoxContainer" unique_id=961730014]
+custom_minimum_size = Vector2(100, 100)
+layout_mode = 2
+texture = ExtResource("2_6p4em")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/HBoxContainer" unique_id=1125969608]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+
+[node name="NameLabel" type="Label" parent="VBoxContainer/HBoxContainer/VBoxContainer" unique_id=1948282810]
+layout_mode = 2
+text = "MathrimC"
+
+[node name="DateLabel" type="Label" parent="VBoxContainer/HBoxContainer/VBoxContainer" unique_id=169252820]
+layout_mode = 2
+text = "Account created: 01/01/2012"
+
+[node name="Description" type="Label" parent="VBoxContainer" unique_id=2145896399]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+text = "Test description."
+autowrap_mode = 2

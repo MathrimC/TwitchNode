@@ -279,8 +279,29 @@ func get_ad_schedule(channel: String) -> Dictionary:
 func snooze_next_ad(channel: String) -> Dictionary:
 	return await _twitch_api.snooze_next_ad(channel)
 
+func get_game_id(name: String) -> Dictionary:
+	return await _twitch_api.get_games([],[name],[])
+
 func get_streams(broadcasters: Array[String], game_ids: Array[String] = [], live_only: bool = false, languages: Array[String] = ["en"]) -> Array:
 	return await _twitch_api.get_streams(broadcasters, game_ids, live_only, languages)
+
+func get_user_info(username: String) -> Dictionary:
+	return await _twitch_api.get_user_info(username)
+
+func get_profile_image(username: String) -> Image:
+	var user_info := await _twitch_api.get_user_info(username)
+	var request := HTTPRequest.new()
+	request.use_threads = true
+	add_child(request)
+	var split_url: PackedStringArray = user_info.profile_image_url.split(".")
+	var path := "user://TwitchNode/profile.%s" % split_url[-1]
+	request.set_download_file(path)
+	request.request(user_info.profile_image_url, [], HTTPClient.METHOD_GET)
+	await request.request_completed
+	request.queue_free()
+	var image := Image.load_from_file(path)
+	DirAccess.remove_absolute(path)
+	return image
 
 func get_auth_url(_scopes: Array[String], _auth_type: AuthType, _redirect_url: String, _state: String = ""):
 	return _twitch_api.get_auth_url(_scopes, _auth_type, _redirect_url, _state)

@@ -143,19 +143,19 @@ const events: Dictionary = {
 	EventType.HYPE_TRAIN_BEGIN : {
 		"type": "channel.hype_train.begin",
 		"scope": "channel:read:hype_train",
-		"version": 1,
+		"version": 2,
 		"condition": ["broadcaster_user_id"]
 	},
 	EventType.HYPE_TRAIN_PROGRESS : {
 		"type": "channel.hype_train.progress",
 		"scope": "channel:read:hype_train",
-		"version": 1,
+		"version": 2,
 		"condition": ["broadcaster_user_id"]
 	},
 	EventType.HYPE_TRAIN_END : {
 		"type": "channel.hype_train.end",
 		"scope": "channel:read:hype_train",
-		"version": 1,
+		"version": 2,
 		"condition": ["broadcaster_user_id"]
 	},
 	EventType.STREAM_ONLINE : {
@@ -854,6 +854,24 @@ func snooze_next_ad(channel: String) -> Dictionary:
 	else:
 		printerr("Can't snooze ads due to missing channel id")
 		return {}
+
+func get_games(game_ids: Array[String], game_names: Array[String], igdb_ids: Array[String]) -> Dictionary:
+	var query_parameters := {}
+	if !game_ids.is_empty():
+		query_parameters["id"] = game_ids
+	if !game_names.is_empty():
+		query_parameters["name"] = game_names
+	if !igdb_ids.is_empty():
+		query_parameters["igdb_id"] = igdb_ids
+	var request := await _execute_request(TwitchAPIRequest.APIOperation.GET_GAMES, "", {}, query_parameters)
+	if request.result != 0 || request.response_code != 200:
+		printerr("Error getting games info from Twitch: result %s - response code %s" % [request.result, request.response_code])
+	return request.response_body
+
+func get_user_info(username: String) -> Dictionary:
+	if await _check_user_ids([username]):
+		return await _get_user_info(user_list[username])
+	return {}
 
 func get_auth_url(_scopes: Array[String], _auth_type: TwitchNode.AuthType, _redirect_uri: String, _state: String = "") -> String:
 	var scopes_str: String

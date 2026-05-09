@@ -12,6 +12,7 @@ const weekdays: Array[String] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Th
 @export var settings_bar: SettingsBar
 @export var connection_info: Container
 @export var channel_info_scene: PackedScene
+@export var profile_popup_scene: PackedScene
 var twitch_auth_window: TwitchAuthWindow
 var label_queue: Array[RichTextLabel]
 var channel_infos: Dictionary
@@ -42,11 +43,21 @@ func _ready() -> void:
 	twitch_node.connected_to_channel.connect(on_connected_to_channel)
 	twitch_node.disconnected_from_channel.connect(on_disconnected_from_channel)
 
+func _on_profile_popup_requested(username: String) -> void:
+	var user_info := await twitch_node.get_user_info(username)
+	var profile_pic := await twitch_node.get_profile_image(username)
+	var profile_popup: ProfilePopup = profile_popup_scene.instantiate()
+	profile_popup.user_info = user_info
+	profile_popup.profile_pic = profile_pic
+	add_child(profile_popup)
+	profile_popup.position = get_viewport().get_mouse_position() + Vector2(0, 20)
+
 func on_connected_to_channel(channel: String, auth_username: String) -> void:
 	var channel_info: ChannelInfo = channel_info_scene.instantiate()
 	channel_info.channel_name = channel
 	channel_info.auth_username = auth_username
 	channel_info.leave_pressed.connect(on_channel_leave_pressed)
+	channel_info.profile_popup_requested.connect(_on_profile_popup_requested)
 	connection_info.add_child(channel_info)
 	channel_infos[channel] = channel_info
 	connection_info.visible = true
