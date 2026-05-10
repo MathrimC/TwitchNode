@@ -285,6 +285,12 @@ func get_game_id(name: String) -> Dictionary:
 func get_streams(broadcasters: Array[String], game_ids: Array[String] = [], live_only: bool = false, languages: Array[String] = ["en"]) -> Array:
 	return await _twitch_api.get_streams(broadcasters, game_ids, live_only, languages)
 
+func get_stream_info(broadcaster: String) -> Dictionary:
+	var results := await _twitch_api.get_streams([broadcaster], [], true)
+	if results.is_empty():
+		return {}
+	return results[0]
+
 func get_user_info(username: String) -> Dictionary:
 	return await _twitch_api.get_user_info(username)
 

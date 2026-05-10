@@ -12,7 +12,7 @@ func _ready() -> void:
 	channel_label.text = channel_name
 
 func _on_label_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton && event.pressed:
+	if event is InputEventMouseButton && (event as InputEventMouseButton).pressed:
 		profile_popup_requested.emit(channel_name)
 
 func on_leave_pressed() -> void:

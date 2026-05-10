@@ -15,7 +15,7 @@ const weekdays: Array[String] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Th
 @export var profile_popup_scene: PackedScene
 var twitch_auth_window: TwitchAuthWindow
 var label_queue: Array[RichTextLabel]
-var channel_infos: Dictionary
+var channel_infos: Dictionary[String, ChannelInfo]
 
 func _ready() -> void:
 	poll_label.visible = false
@@ -43,10 +43,16 @@ func _ready() -> void:
 	twitch_node.connected_to_channel.connect(on_connected_to_channel)
 	twitch_node.disconnected_from_channel.connect(on_disconnected_from_channel)
 
-func _on_profile_popup_requested(username: String) -> void:
+func _on_profile_popup_requested(username: String, is_streamer: bool, is_chatter: bool, channel: String = "") -> void:
 	var user_info := await twitch_node.get_user_info(username)
 	var profile_pic := await twitch_node.get_profile_image(username)
 	var profile_popup: ProfilePopup = profile_popup_scene.instantiate()
+	if is_streamer:
+		var stream_info := await twitch_node.get_stream_info(username)
+		profile_popup.stream_info = stream_info
+	if is_chatter:
+		var follower_info := await twitch_node.get_follower_info(channel.to_lower(),channel_infos[channel.to_lower()].auth_username, username)
+		profile_popup.follower_info = follower_info
 	profile_popup.user_info = user_info
 	profile_popup.profile_pic = profile_pic
 	add_child(profile_popup)
@@ -57,7 +63,7 @@ func on_connected_to_channel(channel: String, auth_username: String) -> void:
 	channel_info.channel_name = channel
 	channel_info.auth_username = auth_username
 	channel_info.leave_pressed.connect(on_channel_leave_pressed)
-	channel_info.profile_popup_requested.connect(_on_profile_popup_requested)
+	channel_info.profile_popup_requested.connect(_on_profile_popup_requested.bind(true, false))
 	connection_info.add_child(channel_info)
 	channel_infos[channel] = channel_info
 	connection_info.visible = true
@@ -71,12 +77,19 @@ func on_disconnected_from_channel(_channel: String, _auth_username: String) -> v
 	if channel_infos.is_empty():
 		connection_info.visible = false
 
-
 func on_new_chat_message(_channel: String, _user: String, _message: String, _event_data: Dictionary) -> void:
 	var color_hex: String = _event_data["color"]
-	_add_label("(%s) [color=%s]%s[/color]: %s" % [_channel, color_hex, _user, _message])
+	var label := _add_label("(%s) [url][color=%s]%s[/color][/url]: %s" % [_channel, color_hex, _user, _message])
+	label.meta_clicked.connect(_on_username_clicked.bind(_channel, _user))
+	label.meta_underlined = false
 	if _message.begins_with("!"):
 		process_command(_channel, _user, _message)
+
+func _on_username_clicked(_meta: String, channel: String, username: String) -> void:
+	# var click_info: Dictionary = JSON.parse_string(meta)
+	# var username: String = click_info.get("username", "")
+	if !username.is_empty():
+		_on_profile_popup_requested(username, false, true, channel)
 
 func on_new_follower(_channel: String, _follower: String, _event_data: Dictionary) -> void:
 	_add_label("New follower: %s" % _follower)
@@ -258,7 +271,7 @@ func _ads(_channel: String, _account: String) -> void:
 	var seconds: int = ads_in_s % 60
 	twitch_node.send_chat_message(_channel, _account, "Ads will play in %s minutes and %s seconds" % [minutes, seconds])
 
-func _add_label(_text: String) -> void:
+func _add_label(_text: String) -> RichTextLabel:
 	var label := RichTextLabel.new()
 	label.bbcode_enabled = true
 	label.fit_content = true
@@ -269,6 +282,7 @@ func _add_label(_text: String) -> void:
 	while label_queue.size() > 100:
 		var old_label: RichTextLabel = label_queue.pop_front()
 		old_label.queue_free()
+	return label
 
 func _scroll_down() -> void:
 	await get_tree().process_frame

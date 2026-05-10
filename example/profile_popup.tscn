@@ -3,15 +3,19 @@
 [ext_resource type="Script" uid="uid://ctl1xbbolwu8r" path="res://example/profile_popup.gd" id="1_4p4hy"]
 [ext_resource type="Texture2D" uid="uid://cfsbeal06h1a3" path="res://icon.svg" id="2_6p4em"]
 
-[node name="ProfilePopup" type="PopupPanel" unique_id=196194595 node_paths=PackedStringArray("profile_rect", "name_label", "date_label", "description_label")]
+[node name="ProfilePopup" type="PopupPanel" unique_id=196194595 node_paths=PackedStringArray("profile_rect", "name_label", "date_label", "stream_category_label", "stream_title_label", "stream_viewer_count_label", "description_label", "follower_date_label")]
 oversampling_override = 1.0
-size = Vector2i(508, 135)
+size = Vector2i(508, 193)
 visible = true
 script = ExtResource("1_4p4hy")
 profile_rect = NodePath("VBoxContainer/HBoxContainer/Pic")
-name_label = NodePath("VBoxContainer/HBoxContainer/VBoxContainer/NameLabel")
+name_label = NodePath("VBoxContainer/HBoxContainer/VBoxContainer/HBoxContainer/NameLabel")
 date_label = NodePath("VBoxContainer/HBoxContainer/VBoxContainer/DateLabel")
+stream_category_label = NodePath("VBoxContainer/HBoxContainer/VBoxContainer/CategoryLabel")
+stream_title_label = NodePath("VBoxContainer/HBoxContainer/VBoxContainer/TitleLabel")
+stream_viewer_count_label = NodePath("VBoxContainer/HBoxContainer/VBoxContainer/HBoxContainer/ViewerCountLabel")
 description_label = NodePath("VBoxContainer/Description")
+follower_date_label = NodePath("VBoxContainer/HBoxContainer/VBoxContainer/FollowerDateLabel")
 
 [node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=2068962978]
 anchors_preset = 15
@@ -35,13 +39,40 @@ expand_mode = 1
 stretch_mode = 5
 
 [node name="VBoxContainer" type="VBoxContainer" parent="VBoxContainer/HBoxContainer" unique_id=1125969608]
+custom_minimum_size = Vector2(0, 100)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 4
 
-[node name="NameLabel" type="Label" parent="VBoxContainer/HBoxContainer/VBoxContainer" unique_id=1948282810]
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/HBoxContainer/VBoxContainer" unique_id=1182453168]
 layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="VBoxContainer/HBoxContainer/VBoxContainer/HBoxContainer" unique_id=1948282810]
+layout_mode = 2
+size_flags_horizontal = 3
 text = "MathrimC"
+
+[node name="ViewerCountLabel" type="Label" parent="VBoxContainer/HBoxContainer/VBoxContainer/HBoxContainer" unique_id=1173073264]
+layout_mode = 2
+text = "20 viewers"
+horizontal_alignment = 2
+
+[node name="TitleLabel" type="RichTextLabel" parent="VBoxContainer/HBoxContainer/VBoxContainer" unique_id=1780948188]
+custom_minimum_size = Vector2(0, 23)
+layout_mode = 2
+size_flags_vertical = 4
+text = "This is a test stream title that is quite long to test the wrapping of long titles."
+scroll_active = false
+
+[node name="CategoryLabel" type="RichTextLabel" parent="VBoxContainer/HBoxContainer/VBoxContainer" unique_id=543394249]
+custom_minimum_size = Vector2(0, 23)
+layout_mode = 2
+size_flags_vertical = 4
+text = "Category: Just Chatting"
+
+[node name="FollowerDateLabel" type="Label" parent="VBoxContainer/HBoxContainer/VBoxContainer" unique_id=566485554]
+layout_mode = 2
+text = "Following since: 2020/09/23 14:24 UTC"
 
 [node name="DateLabel" type="Label" parent="VBoxContainer/HBoxContainer/VBoxContainer" unique_id=169252820]
 layout_mode = 2
